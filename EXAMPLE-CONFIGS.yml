@@ -3,6 +3,7 @@
 VERSION: "1.0.0"
 USER: <tesla user name>
 PASSWD: <tesla password>
+DB: ./teslas.db
 CARS:
   <vin>:
     VIN: <vin>
