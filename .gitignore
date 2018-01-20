@@ -1,1 +1,3 @@
 *.pyc
+.teslas.yml
+teslajson.py
