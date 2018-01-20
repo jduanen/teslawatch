@@ -2,121 +2,358 @@
 # JSON Schema that describes the schema for all of the tables in the Car DB.
 #
 ---
-VERSION: "1.0.0"
-TABLES:
+info:
+  version: "1.0.0"
+
+tables:
   guiSettings:
+    description: Information about the car's GUI settings
+    type: object
     properties:
-      gui_24_hour_time
-        type: "integer"
-        gui_charge_rate_units TEXT,
-        gui_distance_units TEXT,
-        gui_range_display TEXT,
-        gui_temperature_units TEXT,
-        timestamp INTEGER
+      gui_24_hour_time:
+        type: boolean
+      gui_charge_rate_units:
+        type: string
+      gui_distance_units:
+        type: string
+      gui_range_display:
+        type: string
+      gui_temperature_units:
+        type: string
+      timestamp:
+        type: integer
+    required:
+      - gui_24_hour_time
+      - gui_charge_rate_units
+      - gui_distance_units
+      - gui_range_display
+      - gui_temperature_units
+      - timestamp
+    additionalProperties: false
+    readOnly: true
 
-    chargeState:
-        battery_heater_on INTEGER,
-        battery_level INTEGER,
-        battery_range REAL,
-        charge_current_request INTEGER,
-        charge_current_request_max INTEGER,
-        charge_enable_request INTEGER,
-        charge_energy_added REAL,
-        charge_limit_soc INTEGER,
-        charge_limit_soc_max INTEGER,
-        charge_limit_soc_min INTEGER,
-        charge_limit_soc_std INTEGER,
-        charge_miles_added_ideal REAL,
-        charge_miles_added_rated REAL,
-        charge_port_door_open INTEGER,
-        charge_port_latch TEXT,
-        charge_rate REAL,
-        charge_to_max_range INTEGER,
-        charger_actual_current INTEGER,
-        charger_phases NULL,
-        charger_pilot_current INTEGER,
-        charger_power INTEGER,
-        charger_voltage INTEGER,
-        charging_state TEXT,
-        conn_charge_cable TEXT,
-        est_battery_range REAL,
-        fast_charger_brand TEXT,
-        fast_charger_present INTEGER,
-        fast_charger_type TEXT,
-        ideal_battery_range REAL,
-        managed_charging_active INTEGER,
-        managed_charging_start_time TEXT,
-        managed_charging_user_canceled INTEGER,
-        max_range_charge_counter INTEGER,
-        not_enough_power_to_heat INTEGER,
-        scheduled_charging_pending INTEGER,
-        scheduled_charging_start_time INTEGER,
-        time_to_full_charge REAL,
-        timestamp INTEGER,
-        trip_charging INTEGER,
-        usable_battery_level INTEGER,
-        user_charge_enable_request INTEGER
+  chargeState:
+    description: Information about the charge state of the car's battery
+    type: object
+    properties:
+      battery_heater_on:
+        type: boolean
+      battery_level:
+        type: integer
+      battery_range:
+        type: number
+      charge_current_request:
+        type: integer
+      charge_current_request_max:
+        type: integer
+      charge_enable_request:
+        type: boolean
+      charge_energy_added:
+        type: number
+      charge_limit_soc:
+        type: integer
+      charge_limit_soc_max:
+        type: integer
+      charge_limit_soc_min:
+        type: integer
+      charge_limit_soc_std:
+        type: integer
+      charge_miles_added_ideal:
+        type: number
+      charge_miles_added_rated:
+        type: number
+      charge_port_door_open:
+        type: boolean
+      charge_port_latch:
+        type: text
+      charge_rate:
+        type: number
+      charge_to_max_range:
+        type: boolean
+      charger_actual_current:
+        type: integer
+      charger_phases:
+        type: integer
+      charger_pilot_current:
+        type: integer
+      charger_power:
+        type: integer
+      charger_voltage:
+        type: integer
+      charging_state:
+        type: text
+      conn_charge_cable:
+        type: text
+      est_battery_range:
+        type: number
+      fast_charger_brand:
+        type: text
+      fast_charger_present:
+        type: boolean
+      fast_charger_type:
+        type: text
+      ideal_battery_range:
+        type: number
+      managed_charging_active:
+        type: boolean
+      managed_charging_start_time:
+        type: integer
+      managed_charging_user_canceled:
+        type: boolean
+      max_range_charge_counter:
+        type: integer
+      not_enough_power_to_heat:
+        type: boolean
+      scheduled_charging_pending:
+        type: boolean
+      scheduled_charging_start_time:
+        type: integer
+      time_to_full_charge:
+        type: number
+      timestamp:
+        type: integer
+      trip_charging:
+        type: boolean
+      usable_battery_level:
+        type: integer
+      user_charge_enable_request:
+        type: boolean
+    required:
+      - battery_heater_on
+      - battery_level
+      - battery_range
+      - charge_current_request
+      - charge_current_request_max
+      - charge_enable_request
+      - charge_energy_added
+      - charge_limit_soc
+      - charge_limit_soc_max
+      - charge_limit_soc_min
+      - charge_limit_soc_std
+      - charge_miles_added_ideal
+      - charge_miles_added_rated
+      - charge_port_door_open
+      - charge_port_latch
+      - charge_rate
+      - charge_to_max_range
+      - charger_actual_current
+      - charger_phases
+      - charger_pilot_current
+      - charger_power
+      - charger_voltage
+      - charging_state
+      - conn_charge_cable
+      - est_battery_range
+      - fast_charger_brand
+      - fast_charger_present
+      - fast_charger_type
+      - ideal_battery_range
+      - managed_charging_active
+      - managed_charging_start_time
+      - managed_charging_user_canceled
+      - max_range_charge_counter
+      - not_enough_power_to_heat
+      - scheduled_charging_pending
+      - scheduled_charging_start_time
+      - time_to_full_charge
+      - timestamp
+      - trip_charging
+      - usable_battery_level
+      - user_charge_enable_request
+    additionalProperties: false
+    readOnly: true
 
-    climateSettings:
-        id INTEGER PRIMARY KEY,
-        battery_heater INTEGER,
-        battery_heater_no_power INTEGER,
-        driver_temp_setting REAL,
-        fan_status INTEGER,
-        inside_temp REAL,
-        is_auto_conditioning_on INTEGER,
-        is_climate_on INTEGER,
-        is_front_defroster_on INTEGER,
-        is_preconditioning INTEGER,
-        is_rear_defroster_on INTEGER,
-        left_temp_direction INTEGER,
-        max_avail_temp REAL,
-        min_avail_temp REAL,
-        outside_temp REAL,
-        passenger_temp_setting REAL,
-        right_temp_direction INTEGER,
-        seat_heater_left INTEGER,
-        seat_heater_rear_center INTEGER,
-        seat_heater_rear_left INTEGER,
-        seat_heater_rear_left_back INTEGER,
-        seat_heater_rear_right INTEGER,
-        seat_heater_rear_right_back INTEGER,
-        seat_heater_right INTEGER,
-        smart_preconditioning INTEGER,
-        timestamp INTEGER
+  climateSettings:
+    description: Information about the the car's climate control system and its current temperature
+    type: object
+    properties:
+      battery_heater:
+        type: boolean
+      battery_heater_no_power:
+        type: boolean
+      driver_temp_setting:
+        type: number
+      fan_status:
+        type: integer
+      inside_temp:
+        type: number
+      is_auto_conditioning_on:
+        type: boolean
+      is_climate_on:
+        type: boolean
+      is_front_defroster_on:
+        type: boolean
+      is_preconditioning:
+        type: boolean
+      is_rear_defroster_on:
+        type: boolean
+      left_temp_direction:
+        type: integer
+      max_avail_temp:
+        type: number
+      min_avail_temp:
+        type: number
+      outside_temp:
+        type: number
+      passenger_temp_setting:
+        type: number
+      right_temp_direction:
+        type: integer
+      seat_heater_left:
+        type: integer
+      seat_heater_rear_center:
+        type: integer
+      seat_heater_rear_left:
+        type: integer
+      seat_heater_rear_left_back:
+        type: integer
+      seat_heater_rear_right:
+        type: integer
+      seat_heater_rear_right_back:
+        type: integer
+      seat_heater_right:
+        type: integer
+      smart_preconditioning:
+        type: boolean
+      timestamp:
+        type: integer
+    required:
+      - battery_heater
+      - battery_heater_no_power
+      - driver_temp_setting
+      - fan_status
+      - inside_temp
+      - is_auto_conditioning_on
+      - is_climate_on
+      - is_front_defroster_on
+      - is_preconditioning
+      - is_rear_defroster_on
+      - left_temp_direction
+      - max_avail_temp
+      - min_avail_temp
+      - outside_temp
+      - passenger_temp_setting
+      - right_temp_direction
+      - seat_heater_left
+      - seat_heater_rear_center
+      - seat_heater_rear_left
+      - seat_heater_rear_left_back
+      - seat_heater_rear_right
+      - seat_heater_rear_right_back
+      - seat_heater_right
+      - smart_preconditioning
+      - timestamp
+    additionalProperties: false
+    readOnly: true
 
-    vehicleState:
-        api_version INTEGER,
-        autopark_state TEXT,
-        autopark_state_v2 TEXT,
-        calendar_supported INTEGER,
-        car_version TEXT,
-        center_display_state INTEGER,
-        df INTEGER,
-        dr INTEGER,
-        ft INTEGER,
-        locked INTEGER,
-        notifications_supported INTEGER,
-        odometer REAL,
-        parsed_calendar_supported INTEGER,
-        pf INTEGER,
-        pr INTEGER,
-        remote_start INTEGER,
-        remote_start_supported INTEGER,
-        rt INTEGER,
-        sun_roof_percent_open NULL,
-        sun_roof_state TEXT,
-        timestamp INTEGER,
-        valet_mode INTEGER,
-        valet_pin_needed INTEGER,
-        vehicle_name TEXT
+  vehicleState:
+    description: Information about the car's current physical state
+    type: object
+    properties:
+      api_version:
+        type: integer
+      autopark_state:
+        type: string
+      autopark_state_v2:
+        type: string
+      calendar_supported:
+        type: boolean
+      car_version:
+        type: string
+      center_display_state:
+        type: integer
+      df:
+        type: integer
+      dr:
+        type: integer
+      ft:
+        type: integer
+      locked:
+        type: boolean
+      notifications_supported:
+        type: boolean
+      odometer:
+        type: number
+      parsed_calendar_supported:
+        type: boolean
+      pf:
+        type: integer
+      pr:
+        type: integer
+      remote_start:
+        type: boolean
+      remote_start_supported:
+        type: boolean
+      rt:
+        type: integer
+      sun_roof_percent_open:
+        type: string
+      sun_roof_state:
+        type: string
+      timestamp:
+        type: integer
+      valet_mode:
+        type: boolean
+      valet_pin_needed:
+        type: boolean
+      vehicle_name:
+        type: string
+    required:
+      - api_version
+      - autopark_state
+      - autopark_state_v2
+      - calendar_supported
+      - car_version
+      - center_display_state
+      - df
+      - dr
+      - ft
+      - locked
+      - notifications_supported
+      - odometer
+      - parsed_calendar_supported
+      - pf
+      - pr
+      - remote_start
+      - remote_start_supported
+      - rt
+      - sun_roof_percent_open
+      - sun_roof_state
+      - timestamp
+      - valet_mode
+      - valet_pin_needed
+      - vehicle_name
+    additionalProperties: false
+    readOnly: true
 
-    driveState:
-        gps_as_of INTEGER,
-        heading INTEGER,
-        latitude REAL,
-        longitude REAL,
-        power INTEGER,
-        shift_state NULL,
-        speed NULL,
-        timestamp INTEGER
+  driveState:
+    description: Information about the car's current driving state and position
+    type: object
+    properties:
+      gps_as_of:
+        type: integer
+      heading:
+        type: integer
+      latitude:
+        type: number
+      longitude:
+        type: number
+      power:
+        type: integer
+      shift_state:
+        type: string
+      speed:
+        type: number
+      timestamp:
+        type: integer
+    required:
+      - gps_as_of
+      - heading
+      - latitude
+      - longitude
+      - power
+      - shift_state
+      - speed
+      - timestamp
+    additionalProperties: false
+    readOnly: true
