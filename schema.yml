@@ -65,7 +65,7 @@ tables:
       charge_port_door_open:
         type: boolean
       charge_port_latch:
-        type: text
+        type: string
       charge_rate:
         type: number
       charge_to_max_range:
@@ -81,17 +81,17 @@ tables:
       charger_voltage:
         type: integer
       charging_state:
-        type: text
+        type: string
       conn_charge_cable:
-        type: text
+        type: string
       est_battery_range:
         type: number
       fast_charger_brand:
-        type: text
+        type: string
       fast_charger_present:
         type: boolean
       fast_charger_type:
-        type: text
+        type: string
       ideal_battery_range:
         type: number
       managed_charging_active:
