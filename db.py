@@ -1,8 +1,10 @@
+'''
 ################################################################################
 #
 # Sqlite3 DB Library for TeslaWatch Application
 #
 ################################################################################
+'''
 
 
 from __future__ import print_function
@@ -87,12 +89,12 @@ class CarDB(object):
         self.db.close()
 
     def createTable(self, tableName, tableCols):
-        '''Take name and the SQL column defintions for a Table and create it in
-           the DB.
+        ''' Take name and the SQL column defintions for a Table and create it in
+            the DB.
 
-           Inputs
-             tableName: String with name of table to be created
-             tableCols: String with names and types of columns for table
+            Inputs
+              tableName: String with name of table to be created
+              tableCols: String with names and types of columns for table
         '''
         self.cursors[tableName] = None
         c = self.db.cursor()
@@ -101,24 +103,46 @@ class CarDB(object):
         self.db.commit()
 
     def getTable(self, tableName):
+        '''Take name of table and return its rows in a dict.
+
+            Inputs
+              tableName: String with name of table to be created
+        '''
         c = self.db.cursor()
         sqlCmd = "SELECT * FROM {0};".format(tableName)
         table = c.execute(sqlCmd).fetchall()
         return table
 
     def getTables(self):
+        ''' Return contents of all tables in a dict, where keys are the names
+            of the tables in the DB.
+
+            Returns
+              Dict with contents of all tables
+        '''
         tables = {}
         for tableName in self.getTableNames():
             tables[tableName] = self.getTable(tableName)
         return tables
 
     def getTableNames(self):
+        ''' Return list of table names in the current DB.
+
+            Returns
+              List of table names
+        '''
         c = self.db.cursor()
         sqlCmd = "SELECT name FROM sqlite_master WHERE type='table' ORDER BY name;"
         r = c.execute(sqlCmd).fetchall()
         return (str(t[0]) for t in r)
 
     def insertRow(self, tableName, row):
+        ''' Take name of table and a row of data and insert it into the table.
+
+            Inputs
+              tableName: String with name of table to be created
+              row: dict whose keys are names of columns in the Table
+        '''
         c = self.db.cursor()
         cols = ", ".join('"{}"'.format(col) for col in row.keys())
         vals = ", ".join(':{}'.format(col) for col in row.keys())
@@ -127,6 +151,12 @@ class CarDB(object):
         self.db.commit()
 
     def getRows(self, tableName):
+        ''' Take name of table and return an iterator on the table's rows.
+
+            Returns
+              An iterator the returns one row of the table at a time, until no
+              more exist, at which point it returns a None.
+        '''
         self.cursors[tableName] = self.db.cursor()
         sqlCmd = "SELECT * FROM {0};".format(tableName)
         self.cursors[tableName].execute(sqlCmd)
@@ -139,6 +169,8 @@ class CarDB(object):
 if __name__ == '__main__':
     # Print the given message, print the usage string, and exit with an error.
     def fatalError(msg):
+        ''' Print the given msg on stderr and exit.
+        '''
         sys.stderr.write("Error: {0}\n".format(msg))
         sys.stderr.write("Usage: {0}\n".format(usage))
         sys.exit(1)
