@@ -1,0 +1,122 @@
+#
+# JSON Schema that describes the schema for all of the tables in the Car DB.
+#
+---
+VERSION: "1.0.0"
+TABLES:
+  guiSettings:
+    properties:
+      gui_24_hour_time
+        type: "integer"
+        gui_charge_rate_units TEXT,
+        gui_distance_units TEXT,
+        gui_range_display TEXT,
+        gui_temperature_units TEXT,
+        timestamp INTEGER
+
+    chargeState:
+        battery_heater_on INTEGER,
+        battery_level INTEGER,
+        battery_range REAL,
+        charge_current_request INTEGER,
+        charge_current_request_max INTEGER,
+        charge_enable_request INTEGER,
+        charge_energy_added REAL,
+        charge_limit_soc INTEGER,
+        charge_limit_soc_max INTEGER,
+        charge_limit_soc_min INTEGER,
+        charge_limit_soc_std INTEGER,
+        charge_miles_added_ideal REAL,
+        charge_miles_added_rated REAL,
+        charge_port_door_open INTEGER,
+        charge_port_latch TEXT,
+        charge_rate REAL,
+        charge_to_max_range INTEGER,
+        charger_actual_current INTEGER,
+        charger_phases NULL,
+        charger_pilot_current INTEGER,
+        charger_power INTEGER,
+        charger_voltage INTEGER,
+        charging_state TEXT,
+        conn_charge_cable TEXT,
+        est_battery_range REAL,
+        fast_charger_brand TEXT,
+        fast_charger_present INTEGER,
+        fast_charger_type TEXT,
+        ideal_battery_range REAL,
+        managed_charging_active INTEGER,
+        managed_charging_start_time TEXT,
+        managed_charging_user_canceled INTEGER,
+        max_range_charge_counter INTEGER,
+        not_enough_power_to_heat INTEGER,
+        scheduled_charging_pending INTEGER,
+        scheduled_charging_start_time INTEGER,
+        time_to_full_charge REAL,
+        timestamp INTEGER,
+        trip_charging INTEGER,
+        usable_battery_level INTEGER,
+        user_charge_enable_request INTEGER
+
+    climateSettings:
+        id INTEGER PRIMARY KEY,
+        battery_heater INTEGER,
+        battery_heater_no_power INTEGER,
+        driver_temp_setting REAL,
+        fan_status INTEGER,
+        inside_temp REAL,
+        is_auto_conditioning_on INTEGER,
+        is_climate_on INTEGER,
+        is_front_defroster_on INTEGER,
+        is_preconditioning INTEGER,
+        is_rear_defroster_on INTEGER,
+        left_temp_direction INTEGER,
+        max_avail_temp REAL,
+        min_avail_temp REAL,
+        outside_temp REAL,
+        passenger_temp_setting REAL,
+        right_temp_direction INTEGER,
+        seat_heater_left INTEGER,
+        seat_heater_rear_center INTEGER,
+        seat_heater_rear_left INTEGER,
+        seat_heater_rear_left_back INTEGER,
+        seat_heater_rear_right INTEGER,
+        seat_heater_rear_right_back INTEGER,
+        seat_heater_right INTEGER,
+        smart_preconditioning INTEGER,
+        timestamp INTEGER
+
+    vehicleState:
+        api_version INTEGER,
+        autopark_state TEXT,
+        autopark_state_v2 TEXT,
+        calendar_supported INTEGER,
+        car_version TEXT,
+        center_display_state INTEGER,
+        df INTEGER,
+        dr INTEGER,
+        ft INTEGER,
+        locked INTEGER,
+        notifications_supported INTEGER,
+        odometer REAL,
+        parsed_calendar_supported INTEGER,
+        pf INTEGER,
+        pr INTEGER,
+        remote_start INTEGER,
+        remote_start_supported INTEGER,
+        rt INTEGER,
+        sun_roof_percent_open NULL,
+        sun_roof_state TEXT,
+        timestamp INTEGER,
+        valet_mode INTEGER,
+        valet_pin_needed INTEGER,
+        vehicle_name TEXT
+
+    driveState:
+        gps_as_of INTEGER,
+        heading INTEGER,
+        latitude REAL,
+        longitude REAL,
+        power INTEGER,
+        shift_state NULL,
+        speed NULL,
+        timestamp INTEGER
