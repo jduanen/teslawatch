@@ -19,127 +19,18 @@ import yaml
 ####  * Change the TABLES struct into external yaml file with versioning, read it in and construct the sql cmds on the fly
 
 
-DUMMY_VIN = "5YJSA1H10EFP00000"
+DEF_SCHEMA_FILE = "./schema.yml"
 
-TABLES = {
-    'guiSettings': """ CREATE TABLE IF NOT EXISTS guiSettings (
-        id INTEGER PRIMARY KEY,
-        gui_24_hour_time INTEGER,
-        gui_charge_rate_units TEXT,
-        gui_distance_units TEXT,
-        gui_range_display TEXT,
-        gui_temperature_units TEXT,
-        timestamp INTEGER);""",
-    'chargeState': """ CREATE TABLE IF NOT EXISTS chargeState (
-        id INTEGER PRIMARY KEY,
-        battery_heater_on INTEGER,
-        battery_level INTEGER,
-        battery_range REAL,
-        charge_current_request INTEGER,
-        charge_current_request_max INTEGER,
-        charge_enable_request INTEGER,
-        charge_energy_added REAL,
-        charge_limit_soc INTEGER,
-        charge_limit_soc_max INTEGER,
-        charge_limit_soc_min INTEGER,
-        charge_limit_soc_std INTEGER,
-        charge_miles_added_ideal REAL,
-        charge_miles_added_rated REAL,
-        charge_port_door_open INTEGER,
-        charge_port_latch TEXT,
-        charge_rate REAL,
-        charge_to_max_range INTEGER,
-        charger_actual_current INTEGER,
-        charger_phases NULL,
-        charger_pilot_current INTEGER,
-        charger_power INTEGER,
-        charger_voltage INTEGER,
-        charging_state TEXT,
-        conn_charge_cable TEXT,
-        est_battery_range REAL,
-        fast_charger_brand TEXT,
-        fast_charger_present INTEGER,
-        fast_charger_type TEXT,
-        ideal_battery_range REAL,
-        managed_charging_active INTEGER,
-        managed_charging_start_time TEXT,
-        managed_charging_user_canceled INTEGER,
-        max_range_charge_counter INTEGER,
-        not_enough_power_to_heat INTEGER,
-        scheduled_charging_pending INTEGER,
-        scheduled_charging_start_time INTEGER,
-        time_to_full_charge REAL,
-        timestamp INTEGER,
-        trip_charging INTEGER,
-        usable_battery_level INTEGER,
-        user_charge_enable_request INTEGER);""",
-    'climateSettings': """ CREATE TABLE IF NOT EXISTS climateSettings (
-        id INTEGER PRIMARY KEY,
-        battery_heater INTEGER,
-        battery_heater_no_power INTEGER,
-        driver_temp_setting REAL,
-        fan_status INTEGER,
-        inside_temp REAL,
-        is_auto_conditioning_on INTEGER,
-        is_climate_on INTEGER,
-        is_front_defroster_on INTEGER,
-        is_preconditioning INTEGER,
-        is_rear_defroster_on INTEGER,
-        left_temp_direction INTEGER,
-        max_avail_temp REAL,
-        min_avail_temp REAL,
-        outside_temp REAL,
-        passenger_temp_setting REAL,
-        right_temp_direction INTEGER,
-        seat_heater_left INTEGER,
-        seat_heater_rear_center INTEGER,
-        seat_heater_rear_left INTEGER,
-        seat_heater_rear_left_back INTEGER,
-        seat_heater_rear_right INTEGER,
-        seat_heater_rear_right_back INTEGER,
-        seat_heater_right INTEGER,
-        smart_preconditioning INTEGER,
-        timestamp INTEGER);""",
-    'vehicleState': """ CREATE TABLE IF NOT EXISTS vehicleState (
-        id INTEGER PRIMARY KEY,
-        api_version INTEGER,
-        autopark_state TEXT,
-        autopark_state_v2 TEXT,
-        calendar_supported INTEGER,
-        car_version TEXT,
-        center_display_state INTEGER,
-        df INTEGER,
-        dr INTEGER,
-        ft INTEGER,
-        locked INTEGER,
-        notifications_supported INTEGER,
-        odometer REAL,
-        parsed_calendar_supported INTEGER,
-        pf INTEGER,
-        pr INTEGER,
-        remote_start INTEGER,
-        remote_start_supported INTEGER,
-        rt INTEGER,
-        sun_roof_percent_open NULL,
-        sun_roof_state TEXT,
-        timestamp INTEGER,
-        valet_mode INTEGER,
-        valet_pin_needed INTEGER,
-        vehicle_name TEXT);""",
-    'driveState': """ CREATE TABLE IF NOT EXISTS driveState (
-        id INTEGER PRIMARY KEY,
-        gps_as_of INTEGER,
-        heading INTEGER,
-        latitude REAL,
-        longitude REAL,
-        power INTEGER,
-        shift_state NULL,
-        speed NULL,
-        timestamp INTEGER);"""
-}
+DUMMY_VIN = "5YJSA1H10EFP00000"
 
 
 class CarDB(object):
+    TYPE_MAP = {
+        'integer': "INTEGER",
+        'number': "REAL",
+        'boolean': "INTEGER",
+        'string': "TEXT"
+    }
     '''Object that encapsulates the Sqlite3 DB that contains data from a car,
     '''
     def __init__(self, vin, dbFile, schemaFile, create=True):
@@ -166,11 +57,40 @@ class CarDB(object):
         self.db = sqlite3.connect(dbFile)
         self.cursors = {}
 
-        #### TODO read and parse JSON Schema and set up tables schema struct
-        #### FIXME generate 'tableDef' on the fly from the JSON schema
+        if not os.path.exists(schemaFile):
+            raise ValueError("Schema file not found: {0}".format(schemaFile))
+        try:
+            with open(schemaFile, "r") as f:
+                self.schema = yaml.load(f)
+        except IOError:
+            raise
+        except:
+            raise ValueError("Unable to read schema file: {0}".format(schemaFile))
 
-        for tableName, tableDef in TABLES.iteritems():
+        #### TODO validate schema version
+
+        if 'tables' not in self.schema:
+            raise Exception("'tables' field missing from schema file: {0}".format(schemaFile))
+        for tableName in self.schema['tables'].keys():
+            cols = "id INTEGER PRIMARY KEY"
+            keyList = self.schema['tables'][tableName]['properties'].keys()
+            keyList.sort()
+            for colName in keyList:
+                colType = CarDB.TYPE_MAP[self.schema['tables'][tableName]['properties'][colName]['type']]
+                cols += ", {0} {1}".format(colName, colType)
+            tableDef = "CREATE TABLE IF NOT EXISTS {0} ({1});".format(tableName, cols)
             self.createTable(tableName, tableDef)
+
+        '''
+    'guiSettings': """ CREATE TABLE IF NOT EXISTS guiSettings (
+        id INTEGER PRIMARY KEY,
+        gui_24_hour_time INTEGER,
+        gui_charge_rate_units TEXT,
+        gui_distance_units TEXT,
+        gui_range_display TEXT,
+        gui_temperature_units TEXT,
+        timestamp INTEGER);""",
+        '''
 
     def __enter__(self):
         return self
@@ -208,8 +128,8 @@ class CarDB(object):
 
     def insertRow(self, tableName, row):
         c = self.db.cursor()
-        cols = ', '.join('"{}"'.format(col) for col in row.keys())
-        vals = ', '.join(':{}'.format(col) for col in row.keys())
+        cols = ", ".join('"{}"'.format(col) for col in row.keys())
+        vals = ", ".join(':{}'.format(col) for col in row.keys())
         sqlCmd = 'INSERT INTO "{0}" ({1}) VALUES ({2})'.format(tableName, cols, vals)
         c.execute(sqlCmd, row)
         self.db.commit()
@@ -231,19 +151,22 @@ if __name__ == '__main__':
         sys.stderr.write("Usage: {0}\n".format(usage))
         sys.exit(1)
 
-    usage = "Usage: {0} [-v] <dbFile>"
+    usage = "Usage: {0} [-v] [-s <scheaFile>] <dbFile>"
     ap = argparse.ArgumentParser()
+    ap.add_argument(
+        "-s", "--schemaFile", action="store", type=str, default=DEF_SCHEMA_FILE,
+        help="path to the JSON Schema file that describes the DB's tables")
+    ap.add_argument(
+        "-v", "--verbose", action="count", default=0, help="print debug info")
     ap.add_argument(
         "dbFile", action="store", type=str,
         help="path to a test Sqlite3 DB file")
-    ap.add_argument(
-        "-v", "--verbose", action="count", default=0, help="print debug info")
     options = ap.parse_args()
 
     if not options.dbFile:
         fatalError("Must provide test DB file")
 
-    with CarDB(DUMMY_VIN, options.dbFile) as cdb:
+    with CarDB(DUMMY_VIN, options.dbFile, options.schemaFile) as cdb:
         tables = cdb.getTables()
         print("Tables: {0}".format(tables))
 
