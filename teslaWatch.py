@@ -23,7 +23,6 @@ import sqlite3
 import sys
 import time
 import urllib2
-import yaml
 
 import teslajson
 
