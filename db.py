@@ -16,7 +16,6 @@ import yaml
 
 #### TODO
 ####  * Version the schema and put in checks
-####  * Change the TABLES struct into external yaml file with versioning, read it in and construct the sql cmds on the fly
 
 
 DEF_SCHEMA_FILE = "./schema.yml"
@@ -25,14 +24,15 @@ DUMMY_VIN = "5YJSA1H10EFP00000"
 
 
 class CarDB(object):
+    '''Object that encapsulates the Sqlite3 DB that contains data from a car,
+    '''
     TYPE_MAP = {
         'integer': "INTEGER",
         'number': "REAL",
         'boolean': "INTEGER",
         'string': "TEXT"
     }
-    '''Object that encapsulates the Sqlite3 DB that contains data from a car,
-    '''
+
     def __init__(self, vin, dbFile, schemaFile, create=True):
         ''' Instantiate a DB object for the car given by the VIN and connect to
             the given DB file.
@@ -78,19 +78,7 @@ class CarDB(object):
             for colName in keyList:
                 colType = CarDB.TYPE_MAP[self.schema['tables'][tableName]['properties'][colName]['type']]
                 cols += ", {0} {1}".format(colName, colType)
-            tableDef = "CREATE TABLE IF NOT EXISTS {0} ({1});".format(tableName, cols)
-            self.createTable(tableName, tableDef)
-
-        '''
-    'guiSettings': """ CREATE TABLE IF NOT EXISTS guiSettings (
-        id INTEGER PRIMARY KEY,
-        gui_24_hour_time INTEGER,
-        gui_charge_rate_units TEXT,
-        gui_distance_units TEXT,
-        gui_range_display TEXT,
-        gui_temperature_units TEXT,
-        timestamp INTEGER);""",
-        '''
+            self.createTable(tableName, cols)
 
     def __enter__(self):
         return self
@@ -98,13 +86,17 @@ class CarDB(object):
     def __exit__(self, exc_type, exc_value, traceback):
         self.db.close()
 
-    def createTable(self, tableName, tableDef):
-        if options.verbose > 2:
-            print("{0}: ".format(tableName))
-            json.dump(tableDef, sys.stdout, indent=4, sort_keys=True)
-            print("")
+    def createTable(self, tableName, tableCols):
+        '''Take name and the SQL column defintions for a Table and create it in
+           the DB.
+
+           Inputs
+             tableName: String with name of table to be created
+             tableCols: String with names and types of columns for table
+        '''
         self.cursors[tableName] = None
         c = self.db.cursor()
+        tableDef = "CREATE TABLE IF NOT EXISTS {0} ({1});".format(tableName, tableCols)
         c.execute(tableDef)
         self.db.commit()
 
