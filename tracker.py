@@ -6,6 +6,8 @@
 ################################################################################
 '''
 
+import Queue
+import sys
 import time
 
 '''
@@ -41,6 +43,17 @@ EVENT TYPES: all events qualified by day-of-week and time-of-day ranges
   * battery level goes below a given threshold
 '''
 
+# number of seconds between location samples
+LOCATION_SAMPLE_INTERVAL = 5 * 60    # 5 mins
+
+# number of seconds between complete samples (must be greater than LOCATION_SAMPLE_INTERVAL)
+FULL_SAMPLE_INTERVAL = (3 * LOCATION_SAMPLE_INTERVAL)    # 15mins
+
+
+# commands that can be sent on the trackers' command Queue
+TRACKER_CMDS = ("PAUSE", "RESUME", "STOP")
+
+
 def tracker(carObj, carDB, inQ, outQ):
     ''' Per-car process that polls the Tesla API, logs the data, and emits
         notifications.
@@ -58,15 +71,40 @@ def tracker(carObj, carDB, inQ, outQ):
         msg = "TRACKING {0}".format(carName)
         outQ.put(msg)
 
-        while True:
-            #### TODO implement the poll loop
-            time.sleep(5)  #### TMP TMP TMP
+        lastFullSample = int(time.time())
 
-            cmd = inQ.get_nowait()
-            if cmd == "STOP":
-                msg = "STOPPING {0}".format(carName)
-                outQ.put(msg)
-                break
+        while True:
+            try:
+                cmd = inQ.get_nowait()
+                if cmd == "STOP":
+                    msg = "STOPPING {0}".format(carName)
+                    outQ.put(msg)
+                    break
+                elif cmd == "PAUSE":
+                    cmd = inQ.get()
+                    while cmd != "RESUME":
+                        cmd = inQ.get()
+                elif cmd == "RESUME":
+                    pass
+                else:
+                    sys.stderr.write("WARNING: unknown tracker command '{0}'".format(cmd))
+            except Queue.Empty:
+                pass
+
+            #### TODO implement the poll loop
+            #### TEMP TEMP TEMP
+            curTime = int(time.time())
+            if curTime > (lastFullSample + FULL_SAMPLE_INTERVAL):
+                state = carObj.getCarState()
+                if carDB:
+                    carDB.insertState(state)
+                lastFullSample = curTime
+            else:
+                sample = carObj.getDriveState()
+                if carDB:
+                    carDB.insertRow('driveState', sample)
+            time.sleep(LOCATION_SAMPLE_INTERVAL)
+
     except Exception as e:
         msg = "BAILING {0}: {1}".format(carName, e)
         outQ.put(msg)
