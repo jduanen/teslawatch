@@ -53,7 +53,12 @@ class Car(object):
 
     def wakeUp(self):
         ''' Wakeup car'''
-        r = self.vehicle.wake_up()
+        try:
+            r = self.vehicle.wake_up()
+        except Exception as e:
+            sys.stderr.write("WARNING: failed to wake up car '{0}'\n".format(self.vin))
+            return None
+        #### TODO check for error response: print warning and return None
         return r['response']
 
     def getName(self):
@@ -91,7 +96,7 @@ class Car(object):
         state['chargeState'] = self.getChargeState()
         time.sleep(INTER_CMD_DELAY)
 
-        state['climageSettings'] = self.getClimateSettings()
+        state['climateSettings'] = self.getClimateSettings()
         time.sleep(INTER_CMD_DELAY)
 
         state['vehicleState'] = self.getVehicleState()
