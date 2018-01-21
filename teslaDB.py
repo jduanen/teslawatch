@@ -140,12 +140,29 @@ class CarDB(object):
               tableName: String with name of table to be created
               row: dict whose keys are names of columns in the Table
         '''
+        if not row:
+            sys.stderr.write("WARNING: empty row for table '{0}'; skipping...\n".format(tableName))
+            return
         c = self.db.cursor()
         cols = ", ".join('"{}"'.format(col) for col in row.keys())
         vals = ", ".join(':{}'.format(col) for col in row.keys())
         sqlCmd = 'INSERT INTO "{0}" ({1}) VALUES ({2})'.format(tableName, cols, vals)
         c.execute(sqlCmd, row)
         self.db.commit()
+
+    def insertState(self, state):
+        ''' Take dict with a row for each of one or more tables, and insert
+            each of them into their table.
+
+            Inputs
+              state: A dict whose keys are the names of tables in the DB and whose
+                     values are (single) rows for the given table.
+        '''
+        for tableName, row in state.iteritems():
+            try:
+                self.insertRow(tableName, row)
+            except Exception as e:
+                sys.stderr.write("WARNING: failed to log row to table {0}: {1}\n".format(tableName, e))
 
     def getRows(self, tableName):
         ''' Take name of table and return an iterator on the table's rows.
