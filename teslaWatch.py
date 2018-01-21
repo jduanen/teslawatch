@@ -1,5 +1,5 @@
 #!/usr/bin/env python
-
+'''
 ################################################################################
 #
 # Script to watch for Tesla state changes
@@ -9,27 +9,39 @@
 #
 # N.B.
 #  * Values given on command line override those in the config file.
-#  * If no DB file is given (in either the config file or on the command line)
-#    then nothing is logged to the DB.  Otherwise, all data collected from the
-#    Tesla API is logged in a sqlite3 DB.
+#  * If no DB directory path is given (in either the config file or on the
+#    command line) then nothing is logged to the DB.  Otherwise, all data
+#    collected from the Tesla API is logged in a sqlite3 DB -- one file
+#    for each car in the given DB directory, named with each car's VIN.
 #
 ################################################################################
+'''
 
 from __future__ import print_function
 import argparse
 import json
+import multiprocessing as mp
 import os
-import sqlite3
 import sys
 import time
 import urllib2
+import yaml
 
+import teslaDB
 import teslajson
 
 
-DEF_CONFIGS_PATH = "./.teslas.yml"
+# default path to configs file
+DEF_CONFIGS_FILE = "./.teslas.yml"
+
+# default path to DB schema file
+DEF_SCHEMA_FILE = "./schema.yml"
 
 INTER_CMD_DELAY = 0.1
+
+
+# output queue for trackers
+outQ = mp.Queue()
 
 
 def dictDiff(newDict, oldDict):
@@ -59,6 +71,22 @@ def dictDiff(newDict, oldDict):
 
     return (added, removed, changed, unchanged)
 
+
+def tracker(carObj, carDB):
+    ''' Per-car process that polls the Tesla API, logs the data, and emits
+        notifications.
+
+        ????
+
+        Inputs
+          carObj: ????
+          carDB: ????
+    '''
+    carName = carObj.getName()
+    print("TRACKING: {0}".format(carName))
+    outQ.put(carName)
+    time.sleep(30)
+    carDB.close()
 
 
 #### TODO move this to 'tesla.py'
@@ -93,40 +121,44 @@ class Car(object):
                 retries -= 1
                 if retries < 0:
                     return None
+                time.sleep(3)
             if r:
                 break
         return r
 
     def wakeUp(self):
+        ''' Wakeup car'''
         r = self.vehicle.wake_up()
-        #### TODO add to DB
         return r['response']
 
     def getName(self):
-        #### TODO add to DB
+        ''' Return car's name'''
         return self.vehicle['display_name']
 
     def getChargeState(self):
-        #### TODO add to DB
+        ''' Get the car's charge state'''
         return self._dataRequest('charge_state')
 
     def getClimateSettings(self):
-        #### TODO add to DB
+        ''' Get the car's climate settings'''
         return self._dataRequest('climate_state')
 
     def getDriveState(self):
-        #### TODO add to DB
+        ''' Get the car's drive state and location'''
         return self._dataRequest('drive_state')
 
     def getGUISettings(self):
-        #### TODO add to DB
+        ''' Get the car's GUI settings'''
         return self._dataRequest('gui_settings')
 
     def getVehicleState(self):
-        #### TODO add to DB
+        ''' Get the vehicle state for the car'''
         return self._dataRequest('vehicle_state')
 
     def getCarState(self):
+        ''' Get all of the state records for the car from the Tesla API and
+            return them in a dict, with the tables' names as keys.
+        '''
         state = {}
         state['guiSettings'] = self.getGUISettings()
         time.sleep(INTER_CMD_DELAY)
@@ -154,21 +186,24 @@ def main():
         sys.stderr.write("Usage: {0}\n".format(usage))
         sys.exit(1)
 
-    usage = "Usage: {0} [-v] [-c <configsFile>] [-d <dbFile>] [-V <VIN>]"
+    usage = "Usage: {0} [-v] [-c <configsFile>] [-d <dbDir>] [-p <passwd>] [-s <schemaFile>] [-V <VIN>]"
     ap = argparse.ArgumentParser()
     ap.add_argument(
         "-c", "--configsFile", action="store", type=str,
-        default=DEF_CONFIGS_PATH, help="path to file with configurations")
+        default=DEF_CONFIGS_FILE, help="path to file with configurations")
     ap.add_argument(
-        "-d", "--dbFile", action="store", type=str,
-        help="path to file that contains the log DB")
+        "-d", "--dbDir", action="store", type=str,
+        help="path to a directory that contains the DB files for cars")
     ap.add_argument(
         "-p", "--password", action="store", type=str, help="user password")
     ap.add_argument(
-        "-v", "--verbose", action="count", default=0, help="print debug info")
+        "-s", "--schemaFile", action="store", type=str, default=DEF_SCHEMA_FILE,
+        help="path to the JSON Schema file that describes the DB's tables")
     ap.add_argument(
         "-V", "--VIN", action="store", type=str,
         help="VIN of car to use (defaults to all found in config file")
+    ap.add_argument(
+        "-v", "--verbose", action="count", default=0, help="print debug info")
     options = ap.parse_args()
 
     if not os.path.exists(options.configsFile):
@@ -202,17 +237,20 @@ def main():
     if not password:
         password = raw_input("password: ")
 
-    db = None
-    dbFile = confs.get('DB')
-    if options.dbFile:
-        dbFile = options.dbFile
-    if dbFile:
-        if not os.path.exists(dbFile):
-            fatalError("Invalid DB file: {0}".format(dbFile))
-        db = sqlite3.connect(dbFile)
+    dbDir = confs.get('DB_DIR')
+    schemaFile = confs.get('SCHEMA')
+    if options.dbDir:
+        dbDir = options.dbDir
+    if dbDir:
+        if not os.path.isdir(dbDir):
+            fatalError("Invalid DB directory path: {0}".format(dbDir))
+        if options.schemaFile:
+            schemaFile = options.schemaFile
+        if not os.path.isfile(schemaFile):
+            fatalError("Invalid DB schema file: {0}".format(schemaFile))
     else:
         if options.verbose:
-            sys.stderr.write("WARNING: not logging data to DB")
+            sys.stderr.write("WARNING: not logging data to DB\n")
 
     try:
         conn = teslajson.Connection(user, password)
@@ -253,14 +291,10 @@ def main():
         print("")
 
     cars = {}
+    trackers = {}
     for vin in vinList:
-        cars[vin] = Car(vin, confs['CARS'][vin], vehicles[vin])
-
-        #### TODO check if a DB already exists for the given car, if not, create one, with all the Tables (one for every object from the Tesla API)
-
-    for vin, car in cars.items():
-        if options.verbose > 3:
-            print("CAR: {0}".format(car))
+        print(">> {0}; {1}; {2}".format(vin, confs['CARS'][vin], type(vehicles[vin])))
+        cars[vin] = car = Car(vin, confs['CARS'][vin], vehicles[vin])
         if options.verbose > 1:
             print("Waking up {0}".format(car.getName()))
         car.wakeUp()
@@ -274,56 +308,24 @@ def main():
             json.dump(state, sys.stdout, indent=4, sort_keys=True)
             print("")
         time.sleep(INTER_CMD_DELAY)
-
         print("\n")
 
-        #### TODO launch tracker threads for each car
+        cdb = None
+        if dbDir and schemaFile:
+            dbFile = os.path.join(dbDir, vin + ".db")
+            cdb = teslaDB.CarDB(vin, dbFile, schemaFile)
+        trackers[vin] = mp.Process(target=tracker, args=(car, cdb))
+        trackers[vin].start()
 
-    #### TODO cleanup
-    if db:
-        db.close()
+    for vin in trackers:
+        trackers[vin].join()
+    results = [outQ.get() for v in trackers]
+    #### TODO do something with the results
+    if options.verbose > 1:
+        print("Results: ", end='')
+        json.dump(results, sys.stdout, indent=4, sort_keys=True)
+        print("")
+
 
 if __name__ == '__main__':
     main()
-
-"""
-        r = car.getGUISettings()
-        #### TODO add error handler
-        if options.verbose > 1:
-            print("GUISettings: ", end='')
-            json.dump(r, sys.stdout, indent=4, sort_keys=True)
-            print("")
-        time.sleep(INTER_CMD_DELAY)
-
-        r = car.getChargeState()
-        #### TODO add error handler
-        if options.verbose > 1:
-            print("ChargeState: ", end='')
-            json.dump(r, sys.stdout, indent=4, sort_keys=True)
-            print("")
-        time.sleep(INTER_CMD_DELAY)
-
-        r = car.getClimateSettings()
-        #### TODO add error handler
-        if options.verbose > 1:
-            print("ClimateSettings: ", end='')
-            json.dump(r, sys.stdout, indent=4, sort_keys=True)
-            print("")
-        time.sleep(INTER_CMD_DELAY)
-
-        r = car.getVehicleState()
-        #### TODO add error handler
-        if options.verbose > 1:
-            print("VehicleState: ", end='')
-            json.dump(r, sys.stdout, indent=4, sort_keys=True)
-            print("")
-        time.sleep(INTER_CMD_DELAY)
-
-        r = car.getDriveState()
-        #### TODO add error handler
-        if options.verbose > 1:
-            print("DriveState: ", end='')
-            json.dump(r, sys.stdout, indent=4, sort_keys=True)
-            print("")
-        time.sleep(INTER_CMD_DELAY)
-"""
