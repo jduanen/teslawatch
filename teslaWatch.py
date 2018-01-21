@@ -23,6 +23,7 @@ import json
 import multiprocessing as mp
 import os
 import random
+import signal
 import sys
 import time
 import yaml
@@ -38,10 +39,6 @@ DEF_CONFIGS_FILE = "./.teslas.yml"
 
 # default path to DB schema file
 DEF_SCHEMA_FILE = "./schema.yml"
-
-
-# output queue for trackers
-outQ = mp.Queue()
 
 
 def dictDiff(newDict, oldDict):
@@ -72,6 +69,59 @@ def dictDiff(newDict, oldDict):
     return (added, removed, changed, unchanged)
 
 
+def commandInterpreter(trackers, cmdQs, respQs):
+    #### TODO implement cmd interpreter and send cmds to running trackers to restart them and change their events
+    cmd = ""
+    while True:
+        line = raw_input("> ")
+        words = line.split(' ')
+        cmd = words[0].lower().strip()
+        args = words[1:]
+        if cmd == 'l':
+            print("Tracking: {0}".format(trackers.keys()))
+        if cmd == 'p':
+            vin = args[0]
+            if vin not in trackers:
+                print("ERROR: VIN '{0}' not being tracked".format(vin))
+            else:
+                dumpQueue(respQs[vin])
+        if cmd == 'r':
+            pass
+        if cmd == 's':
+            vin = args[0]
+            if vin not in trackers:
+                print("ERROR: VIN '{0}' not being tracked".format(vin))
+            else:
+                cmdQs[vin].put("STOP")
+                #### TODO reread trackers
+        elif cmd == 'q':
+            break
+        elif cmd == '?' or cmd == 'h':
+            print("Help:")
+            print("    h: print this help message")
+            print("    l: show VINs of cars being tracked")
+            print("    p <vin>: print output from car given by <vin>")
+            print("    r: stop and restart all trackers, re-reading the configs file")
+            print("    s <vin>: stop tracking the car given by <vin>")
+            print("    q: quit")
+            print("    ?: print this help message")
+    return
+
+
+def dumpQueue(q):
+    result = []
+    for msg in iter(q.get, 'STOP'):
+        result.append(msg)
+    time.sleep(.1)
+    return result
+
+
+def signalHandler(sig, frame):
+    if sig == signal.SIGHUP:
+        print("SIGHUP")
+        #### TODO stop, reload, and restart everything
+
+
 #
 # MAIN
 #
@@ -82,7 +132,7 @@ def main():
         sys.stderr.write("Usage: {0}\n".format(usage))
         sys.exit(1)
 
-    usage = "Usage: {0} [-v] [-c <configsFile>] [-d <dbDir>] [-p <passwd>] [-s <schemaFile>] [-V <VIN>]"
+    usage = "Usage: {0} [-v] [-c <configsFile>] [-d <dbDir>] [-i] [-p <passwd>] [-s <schemaFile>] [-V <VIN>]"
     ap = argparse.ArgumentParser()
     ap.add_argument(
         "-c", "--configsFile", action="store", type=str,
@@ -90,6 +140,9 @@ def main():
     ap.add_argument(
         "-d", "--dbDir", action="store", type=str,
         help="path to a directory that contains the DB files for cars")
+    ap.add_argument(
+        "-i", "--interactive", action="store_true", default=False,
+        help="enable interactive mode")
     ap.add_argument(
         "-p", "--password", action="store", type=str, help="user password")
     ap.add_argument(
@@ -148,6 +201,8 @@ def main():
         if options.verbose:
             sys.stderr.write("WARNING: not logging data to DB\n")
 
+    signal.signal(signal.SIGHUP, signalHandler)
+
     try:
         conn = teslajson.Connection(user, password)
     except Exception as e:
@@ -187,6 +242,8 @@ def main():
         print("")
 
     cars = {}
+    cmdQs = {}
+    respQs = {}
     trackers = {}
     for vin in vinList:
         cars[vin] = car = Car(vin, confs['CARS'][vin], vehicles[vin])
@@ -194,7 +251,8 @@ def main():
             print("Waking up {0}".format(car.getName()))
         car.wakeUp()
         #### TODO add error handler
-        time.sleep(5)
+
+        time.sleep(random.randint(15, 45))
 
         state = car.getCarState()
         #### TODO add error handler
@@ -202,27 +260,27 @@ def main():
             print("CarState: ", end='')
             json.dump(state, sys.stdout, indent=4, sort_keys=True)
             print("")
-        time.sleep(5)
-        print("\n")
 
         cdb = None
         if dbDir and schemaFile:
             dbFile = os.path.join(dbDir, vin + ".db")
             cdb = teslaDB.CarDB(vin, dbFile, schemaFile)
-        trackers[vin] = mp.Process(target=tracker, args=(car, cdb, outQ))
+        cmdQs[vin] = mp.Queue()
+        respQs[vin] = mp.Queue()
+        trackers[vin] = mp.Process(target=tracker, args=(car, cdb, cmdQs[vin], respQs[vin]))
         trackers[vin].start()
 
-        time.sleep(random.randint(15, 45))
+    if options.interactive:
+        commandInterpreter(trackers, cmdQs, respQs)
 
     for vin in trackers:
         trackers[vin].join()
-    results = [outQ.get() for v in trackers]
-    #### TODO do something with the results
-    if options.verbose > 1:
-        print("Results: ", end='')
-        json.dump(results, sys.stdout, indent=4, sort_keys=True)
-        print("")
 
+    if options.verbose > 1:
+        for vin in trackers:
+            print("Results for {0}:".format(vin))
+            dumpQueue(respQs[vin])
+            print("")
 
 if __name__ == '__main__':
     main()
