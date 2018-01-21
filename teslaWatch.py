@@ -22,12 +22,14 @@ import argparse
 import json
 import multiprocessing as mp
 import os
+import random
 import sys
 import time
-import urllib2
 import yaml
 
+from teslaCar import Car
 import teslaDB
+from tracker import tracker
 import teslajson
 
 
@@ -36,8 +38,6 @@ DEF_CONFIGS_FILE = "./.teslas.yml"
 
 # default path to DB schema file
 DEF_SCHEMA_FILE = "./schema.yml"
-
-INTER_CMD_DELAY = 0.1
 
 
 # output queue for trackers
@@ -70,110 +70,6 @@ def dictDiff(newDict, oldDict):
     unchanged = (common - changed)
 
     return (added, removed, changed, unchanged)
-
-
-def tracker(carObj, carDB):
-    ''' Per-car process that polls the Tesla API, logs the data, and emits
-        notifications.
-
-        ????
-
-        Inputs
-          carObj: ????
-          carDB: ????
-    '''
-    carName = carObj.getName()
-    print("TRACKING: {0}".format(carName))
-    outQ.put(carName)
-    time.sleep(30)
-    carDB.close()
-
-
-#### TODO move this to 'tesla.py'
-class Car(object):
-    '''Car object that encapsulates the state of a car,
-    '''
-    def __init__(self, vin, config, vehicle):
-        self.vin = vin
-        self.config = config
-        self.vehicle = vehicle
-
-    def __str__(self):
-        s = "VIN: {0}\n".format(self.vin)
-        j = json.dumps(self.config, indent=4, sort_keys=True)
-        s += "config: " + j + "\n"
-        j = json.dumps(self.vehicle, indent=4, sort_keys=True)
-        s += "vehicle: " + j + "\n"
-        return s
-
-    def _dataRequest(self, cmd, retries=3):
-        r = None
-        while True:
-            try:
-                r = self.vehicle.data_request(cmd)
-            except urllib2.HTTPError as e:
-                #### TODO better exception handler
-                sys.stderr.write("WARNING: {0}\n".format(e))
-                if e.code == 400:
-                    return None
-                elif e.code == 404:
-                    return None
-                retries -= 1
-                if retries < 0:
-                    return None
-                time.sleep(3)
-            if r:
-                break
-        return r
-
-    def wakeUp(self):
-        ''' Wakeup car'''
-        r = self.vehicle.wake_up()
-        return r['response']
-
-    def getName(self):
-        ''' Return car's name'''
-        return self.vehicle['display_name']
-
-    def getChargeState(self):
-        ''' Get the car's charge state'''
-        return self._dataRequest('charge_state')
-
-    def getClimateSettings(self):
-        ''' Get the car's climate settings'''
-        return self._dataRequest('climate_state')
-
-    def getDriveState(self):
-        ''' Get the car's drive state and location'''
-        return self._dataRequest('drive_state')
-
-    def getGUISettings(self):
-        ''' Get the car's GUI settings'''
-        return self._dataRequest('gui_settings')
-
-    def getVehicleState(self):
-        ''' Get the vehicle state for the car'''
-        return self._dataRequest('vehicle_state')
-
-    def getCarState(self):
-        ''' Get all of the state records for the car from the Tesla API and
-            return them in a dict, with the tables' names as keys.
-        '''
-        state = {}
-        state['guiSettings'] = self.getGUISettings()
-        time.sleep(INTER_CMD_DELAY)
-
-        state['chargeState'] = self.getChargeState()
-        time.sleep(INTER_CMD_DELAY)
-
-        state['climageSettings'] = self.getClimateSettings()
-        time.sleep(INTER_CMD_DELAY)
-
-        state['vehicleState'] = self.getVehicleState()
-        time.sleep(INTER_CMD_DELAY)
-
-        state['driveState'] = self.getDriveState()
-        return state
 
 
 #
@@ -293,13 +189,12 @@ def main():
     cars = {}
     trackers = {}
     for vin in vinList:
-        print(">> {0}; {1}; {2}".format(vin, confs['CARS'][vin], type(vehicles[vin])))
         cars[vin] = car = Car(vin, confs['CARS'][vin], vehicles[vin])
         if options.verbose > 1:
             print("Waking up {0}".format(car.getName()))
         car.wakeUp()
         #### TODO add error handler
-        time.sleep(INTER_CMD_DELAY)
+        time.sleep(5)
 
         state = car.getCarState()
         #### TODO add error handler
@@ -307,15 +202,17 @@ def main():
             print("CarState: ", end='')
             json.dump(state, sys.stdout, indent=4, sort_keys=True)
             print("")
-        time.sleep(INTER_CMD_DELAY)
+        time.sleep(5)
         print("\n")
 
         cdb = None
         if dbDir and schemaFile:
             dbFile = os.path.join(dbDir, vin + ".db")
             cdb = teslaDB.CarDB(vin, dbFile, schemaFile)
-        trackers[vin] = mp.Process(target=tracker, args=(car, cdb))
+        trackers[vin] = mp.Process(target=tracker, args=(car, cdb, outQ))
         trackers[vin].start()
+
+        time.sleep(random.randint(15, 45))
 
     for vin in trackers:
         trackers[vin].join()
