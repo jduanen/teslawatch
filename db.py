@@ -20,11 +20,6 @@ import yaml
 ####  * Version the schema and put in checks
 
 
-DEF_SCHEMA_FILE = "./schema.yml"
-
-DUMMY_VIN = "5YJSA1H10EFP00000"
-
-
 class CarDB(object):
     '''Object that encapsulates the Sqlite3 DB that contains data from a car,
     '''
@@ -86,6 +81,9 @@ class CarDB(object):
         return self
 
     def __exit__(self, exc_type, exc_value, traceback):
+        self.close()
+
+    def close(self):
         self.db.close()
 
     def createTable(self, tableName, tableCols):
@@ -167,6 +165,10 @@ class CarDB(object):
 # TESTING
 #
 if __name__ == '__main__':
+    DEF_SCHEMA_FILE = "./schema.yml"
+
+    DUMMY_VIN = "5YJSA1H10EFP00000"
+
     # Print the given message, print the usage string, and exit with an error.
     def fatalError(msg):
         ''' Print the given msg on stderr and exit.
@@ -175,7 +177,7 @@ if __name__ == '__main__':
         sys.stderr.write("Usage: {0}\n".format(usage))
         sys.exit(1)
 
-    usage = "Usage: {0} [-v] [-s <scheaFile>] <dbFile>"
+    usage = "Usage: {0} [-v] [-s <schemaFile>] <dbFile>"
     ap = argparse.ArgumentParser()
     ap.add_argument(
         "-s", "--schemaFile", action="store", type=str, default=DEF_SCHEMA_FILE,
