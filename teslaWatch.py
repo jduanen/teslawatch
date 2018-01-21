@@ -22,6 +22,7 @@ import argparse
 import json
 import multiprocessing as mp
 import os
+import Queue
 import random
 import signal
 import sys
@@ -33,12 +34,20 @@ import teslaDB
 from tracker import tracker
 import teslajson
 
+'''
+TODO:
+  * convert all files over to use 'looging'
+'''
 
 # default path to configs file
 DEF_CONFIGS_FILE = "./.teslas.yml"
 
 # default path to DB schema file
 DEF_SCHEMA_FILE = "./schema.yml"
+
+
+# Command Queues for each tracker
+cmdQs = {}
 
 
 def dictDiff(newDict, oldDict):
@@ -84,7 +93,7 @@ def commandInterpreter(trackers, cmdQs, respQs):
             if vin not in trackers:
                 print("ERROR: VIN '{0}' not being tracked".format(vin))
             else:
-                dumpQueue(respQs[vin])
+                print(dumpQueue(respQs[vin]))
         if cmd == 'r':
             pass
         if cmd == 's':
@@ -110,9 +119,13 @@ def commandInterpreter(trackers, cmdQs, respQs):
 
 def dumpQueue(q):
     result = []
-    for msg in iter(q.get, 'STOP'):
-        result.append(msg)
-    time.sleep(.1)
+    try:
+        msg = q.get(True, 0.1)
+        while msg:
+            result.append(msg)
+            msg = q.get(True, 0.1)
+    except Queue.Empty:
+        pass
     return result
 
 
@@ -120,6 +133,9 @@ def signalHandler(sig, frame):
     if sig == signal.SIGHUP:
         print("SIGHUP")
         #### TODO stop, reload, and restart everything
+    elif sig == signal.SIGABRT:
+        print("SIGABRT")
+        #### TODO send "STOP" messages to all trackers
 
 
 #
@@ -242,29 +258,34 @@ def main():
         print("")
 
     cars = {}
-    cmdQs = {}
     respQs = {}
     trackers = {}
     for vin in vinList:
         cars[vin] = car = Car(vin, confs['CARS'][vin], vehicles[vin])
         if options.verbose > 1:
             print("Waking up {0}".format(car.getName()))
-        car.wakeUp()
-        #### TODO add error handler
+        if not car.wakeUp():
+            if options.verbose > 1:
+                print("Unable to wake up '{0}', skipping...".format(car.getName()))
+            time.sleep(random.randint(5, 15))
+            continue
 
+        # give car time to wake up and dither start times across cars
         time.sleep(random.randint(15, 45))
-
-        state = car.getCarState()
-        #### TODO add error handler
-        if options.verbose > 1:
-            print("CarState: ", end='')
-            json.dump(state, sys.stdout, indent=4, sort_keys=True)
-            print("")
 
         cdb = None
         if dbDir and schemaFile:
             dbFile = os.path.join(dbDir, vin + ".db")
             cdb = teslaDB.CarDB(vin, dbFile, schemaFile)
+
+        state = car.getCarState()
+        if options.verbose > 1:
+            print("CarState: ", end='')
+            json.dump(state, sys.stdout, indent=4, sort_keys=True)
+            print("")
+        if cdb:
+            cdb.insertState(state)
+
         cmdQs[vin] = mp.Queue()
         respQs[vin] = mp.Queue()
         trackers[vin] = mp.Process(target=tracker, args=(car, cdb, cmdQs[vin], respQs[vin]))
@@ -278,8 +299,7 @@ def main():
 
     if options.verbose > 1:
         for vin in trackers:
-            print("Results for {0}:".format(vin))
-            dumpQueue(respQs[vin])
+            print("Results for {0}: {1}".format(vin, dumpQueue(respQs[vin])))
             print("")
 
 if __name__ == '__main__':
