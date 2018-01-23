@@ -1,0 +1,7 @@
+#
+# JSON Schema that describes the schema for all of the tables in the Car DB.
+#
+---
+info:
+  version: "1.0.0"
+
