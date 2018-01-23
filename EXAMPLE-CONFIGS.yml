@@ -1,13 +1,30 @@
 %YAML 1.1
 ---
-VERSION: "1.0.0"
-USER: <tesla user name>
-PASSWD: <tesla password>
-DB_DIR: ./teslas
-SCHEMA: ./schema.yml
-CARS:
+version: "1.0.0"
+user: <tesla user name>
+passwd: <tesla password>
+dbDir: ./teslas
+schema: ./dbSchema.yml
+logLevel: WARNING
+logFile: /tmp/teslaWatch.log
+cars:
   <vin>:
     VIN: <vin>
+    notifiers:
+      SMS:
+        REGION_ENTER:
+          - HOME
+          - WORK
+        REGION_EXIT
+          - HOME
+          - WORK
+      email:
+        ????:
+          - ABOVE
+          - BELOW
+      myFunction2:
+        ????:
+          - ????
     nickname: <string>
     regions:
       - HOME:

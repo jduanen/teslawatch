@@ -20,6 +20,7 @@
 from __future__ import print_function
 import argparse
 import json
+import logging
 import multiprocessing as mp
 import os
 import Queue
@@ -29,6 +30,8 @@ import sys
 import time
 import yaml
 
+from notify import Notifier
+from regions import Region
 from teslaCar import Car
 import teslaDB
 from tracker import tracker
@@ -43,11 +46,7 @@ TODO:
 DEF_CONFIGS_FILE = "./.teslas.yml"
 
 # default path to DB schema file
-DEF_SCHEMA_FILE = "./schema.yml"
-
-
-# Command Queues for each tracker
-cmdQs = {}
+DEF_SCHEMA_FILE = "./dbSchema.yml"
 
 
 def dictDiff(newDict, oldDict):
@@ -129,26 +128,30 @@ def dumpQueue(q):
     return result
 
 
-def signalHandler(sig, frame):
-    if sig == signal.SIGHUP:
-        print("SIGHUP")
-        #### TODO stop, reload, and restart everything
-    elif sig == signal.SIGABRT:
-        print("SIGABRT")
-        #### TODO send "STOP" messages to all trackers
-
 
 #
 # MAIN
 #
 def main():
-    # Print the given message, print the usage string, and exit with an error.
     def fatalError(msg):
+        ''' Print the given message, print the usage string, and exit with an error.
+        '''
         sys.stderr.write("Error: {0}\n".format(msg))
         sys.stderr.write("Usage: {0}\n".format(usage))
         sys.exit(1)
 
-    usage = "Usage: {0} [-v] [-c <configsFile>] [-d <dbDir>] [-i] [-p <passwd>] [-s <schemaFile>] [-V <VIN>]"
+    def signalHandler(sig, frame):
+        ''' Catch SIGHUP to force a reload/restart and SIGINT to stop all.""
+        '''
+        if sig == signal.SIGHUP:
+            print("SIGHUP")
+            #### TODO stop, reload, and restart everything
+        elif sig == signal.SIGINT:
+            print("SIGINT")
+            for q in cmdQs:
+                q.send("STOP")
+
+    usage = "Usage: {0} [-v] [-c <configsFile>] [-d <dbDir>] [-i] [-L <logLevel>] [-l <logFile>] [-p <passwd>] [-s <schemaFile>] [-V <VIN>]"
     ap = argparse.ArgumentParser()
     ap.add_argument(
         "-c", "--configsFile", action="store", type=str,
@@ -159,6 +162,12 @@ def main():
     ap.add_argument(
         "-i", "--interactive", action="store_true", default=False,
         help="enable interactive mode")
+    ap.add_argument(
+        "-L", "--logLevel", action="store", type="string",
+        help="Logging level (i.e., DEBUG, INFO, WARNING, ERROR, or CRITICAL)")
+    ap.add_argument(
+        "-l", "--logFile", action="store", type="string",
+        help="Path to location where logfile is to be written (created if doesn't exist)")
     ap.add_argument(
         "-p", "--password", action="store", type=str, help="user password")
     ap.add_argument(
@@ -181,29 +190,45 @@ def main():
     if options.verbose > 3:
         json.dump(confs, sys.stdout, indent=4, sort_keys=True)    #### TMP TMP TMP
         print("")
+    #### TODO validate config file against ./configSchema.yml, remove error checks and rely on this
 
     if options.VIN:
         carVINs = [options.VIN]
     else:
-        carVINs = confs['CARS'].keys()
+        carVINs = confs['cars'].keys()
     if options.verbose > 2:
-        print("CARS: {0}".format(carVINs))
+        print("cars: {0}".format(carVINs))
 
-    user = confs.get('USER')
+    user = confs.get('user')
     if not user:
         user = raw_input("user: ")
     if options.verbose > 2:
-        print("USER: {0}".format(user))
+        print("user: {0}".format(user))
 
     if options.password:
         password = options.password
     else:
-        password = confs.get('PASSWD')
+        password = confs.get('passwd')
     if not password:
         password = raw_input("password: ")
 
-    dbDir = confs.get('DB_DIR')
-    schemaFile = confs.get('SCHEMA')
+    logLevel = confs.get('logLevel')
+    if options.logLevel:
+        logLevel = options.logLevel
+    logLevel = logLevel.upper()
+
+    logFile = confs.get('logFile')
+    if options.logFile:
+        logFile = options.logFile
+    if not options.logLevel:
+        l = getattr(logging, logLevel, None)
+        #### TODO remove tests and rely on jsonschema validation
+        if not isinstance(l, int):
+            fatalError("Invalid log level: {0}\n".format(logLevel))
+        logging.basicConfig(filename=logFile, level=l)
+
+    dbDir = confs.get('dbDir')
+    schemaFile = confs.get('schema')
     if options.dbDir:
         dbDir = options.dbDir
     if dbDir:
@@ -218,6 +243,7 @@ def main():
             sys.stderr.write("WARNING: not logging data to DB\n")
 
     signal.signal(signal.SIGHUP, signalHandler)
+    signal.signal(signal.SIGINT, signalHandler)
 
     try:
         conn = teslajson.Connection(user, password)
@@ -258,12 +284,18 @@ def main():
         print("")
 
     cars = {}
+    cmdQs = {}
     respQs = {}
+    regions = []
     trackers = {}
     for vin in vinList:
-        cars[vin] = car = Car(vin, confs['CARS'][vin], vehicles[vin])
+        conf = confs['cars'][vin]
+        for region in conf.get('regions'):
+            regions.append(Region(region))
+
+        cars[vin] = car = Car(vin, conf, vehicles[vin])
         if options.verbose > 1:
-            print("Waking up {0}".format(car.getName()))
+            print("Waking up {0}: {1}".format(vin, car.getName()))
         if not car.wakeUp():
             if options.verbose > 1:
                 print("Unable to wake up '{0}', skipping...".format(car.getName()))
@@ -278,17 +310,10 @@ def main():
             dbFile = os.path.join(dbDir, vin + ".db")
             cdb = teslaDB.CarDB(vin, dbFile, schemaFile)
 
-        state = car.getCarState()
-        if options.verbose > 1:
-            print("CarState: ", end='')
-            json.dump(state, sys.stdout, indent=4, sort_keys=True)
-            print("")
-        if cdb:
-            cdb.insertState(state)
-
         cmdQs[vin] = mp.Queue()
         respQs[vin] = mp.Queue()
-        trackers[vin] = mp.Process(target=tracker, args=(car, cdb, cmdQs[vin], respQs[vin]))
+        notifier = Notifier(conf.get('notifiers'))
+        trackers[vin] = mp.Process(target=tracker, args=(car, cdb, regions, notifier, cmdQs[vin], respQs[vin]))
         trackers[vin].start()
 
     if options.interactive:
