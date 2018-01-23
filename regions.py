@@ -206,6 +206,25 @@ class Fence(Shape):
                 # ????
 
 
+class Region(object):
+    '''
+        Inputs
+          specs: dict of Region Specifications
+    '''
+    def __init__(self, specs):
+        pass
+
+    def isInRegion(self, location):
+        ''' Take a location object and return True if it is in the Region.
+            Inputs
+              location: a Location object
+
+            Returns
+              True if location within the Region, or False if not
+        '''
+        pass
+
+
 #
 # TESTING
 #

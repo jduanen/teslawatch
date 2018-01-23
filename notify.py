@@ -1,3 +1,10 @@
+'''
+################################################################################
+#
+# Notification Handler Library for TeslaWatch Application
+#
+################################################################################
+'''
 
 '''
 --------------------
@@ -17,3 +24,24 @@ $ curl -X POST https://textbelt.com/text \
 $ curl https://textbelt.com/status/2861516228856794
 {"success":true,"status":"DELIVERED"}
 '''
+
+'''
+TODO:
+  * look at how I did the JBOD drivers and make a subdir with Event Function
+  * instantiate an EventHandler object that binds event types to Event Functions
+  * create structure with Event types (and args)
+'''
+
+eventTypes = {
+    'a': 1
+}
+
+
+class Notifier(object):
+    ''' ????
+    '''
+
+    def __init__(self, arg):
+        ''' ????
+        '''
+        pass
