@@ -181,7 +181,7 @@ class CarDB(object):
 # TESTING
 #
 if __name__ == '__main__':
-    DEF_SCHEMA_FILE = "./schema.yml"
+    DEF_SCHEMA_FILE = "./dbSchema.yml"
 
     DUMMY_VIN = "5YJSA1H10EFP00000"
 
