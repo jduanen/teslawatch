@@ -9,8 +9,10 @@
 import Queue
 import sys
 import time
+import traceback
 
-from location import Location
+from LatLon import (LatLon, Latitude, Longitude)
+
 from regions import Region
 
 
@@ -60,93 +62,139 @@ EVENT TYPES: all events qualified by day-of-week and time-of-day ranges
   * battery level goes below a given threshold
 '''
 
-# Intervals between samples of the Tesla API (quantized to integer multiples
-#  of the min time), given in units of seconds.
-#### TODO make more rational choices for these values
-intervals = {
-    'chargeState': 5 * 60,
-    'climateSettings': 10 * 60,
-    'driveStateD': 1,
-    'driveStateP': 30,
-    'guiSettings': 3 * 60,
-    'vehicleState': 60
-}
-
 # commands that can be sent on the trackers' command Queue
 TRACKER_CMDS = ("PAUSE", "RESUME", "STOP")
 
 
-def tracker(carObj, carDB, regions, notifier, inQ, outQ):
-    ''' Per-car process that polls the Tesla API, logs the data, and emits
-        notifications.
+def dictDiff(newDict, oldDict):
+    '''Take a pair of dictionaries and return a four-tuple with the elements
+       that are: added, removed, changed, and unchanged between the new
+       and the old dicts.
+       Inputs:
+         newDict: dict whose content might have changed
+         oldDict: dict that is being compared against
 
-        ????
-
-        Inputs
-          carObj: Car object for the car to track
-          carDB: CarDB object to log the data for the car being tracked
-          regions: ????
-          notifier: ????
-          inQ: MP Queue object for receiving commands from the master
-          outQ: MP Queue object for returning status
+       Returns
+         added: set of dicts that were added
+         removed: set of dicts that were removed
+         changed: set of dicts that were changed
+         unchanged: set of dicts that were not changed
     '''
-    state = carObj.getCarState()
-    if carDB:
-        carDB.insertState(state)
-    now = int(time.time())
-    lastSampled = {
-        'chargeState': now,
-        'climateSettings': now,
-        'driveStateD': now,
-        'driveStateP': now,
-        'guiSettings': now,
-        'vehicleState': now
-    }
-    prevLoc = Location(state['driveState']['latitude'], state['driveState']['longitude'])
-    try:
-        carName = carObj.getName()
-        msg = "TRACKING {0}".format(carName)
-        outQ.put(msg)
+    inOld = set(oldDict)
+    inNew = set(newDict)
 
-        lastFullSample = int(time.time())
+    added = (inNew - inOld)
+    removed = (inOld - inNew)
 
-        while True:
-            try:
-                cmd = inQ.get_nowait()
-                if cmd == "STOP":
-                    msg = "STOPPING {0}".format(carName)
-                    outQ.put(msg)
-                    break
-                elif cmd == "PAUSE":
-                    cmd = inQ.get()
-                    while cmd != "RESUME":
-                        cmd = inQ.get()
-                elif cmd == "RESUME":
+    common = inOld.intersection(inNew)
+
+    changed = set(x for x in common if oldDict[x] != newDict[x])
+    unchanged = (common - changed)
+
+    return (added, removed, changed, unchanged)
+
+
+class Tracker(object):
+    ''' Object that encapsulates all of the state associated with a car that is being tracked
+    '''
+    def __init__(self, carObj, carDB, tables, settings, regions, notifier, inQ, outQ):
+        ''' Construct a tracker object
+
+            Inputs
+              carObj: Car object for the car to track
+              carDB: CarDB object to log the data for the car being tracked
+              tables: ????
+              settings: ????
+              regions: ????
+              notifier: ????
+              inQ: MP Queue object for receiving commands from the master
+              outQ: MP Queue object for returning status
+        '''
+        self.car = carObj
+        self.db = carDB
+        self.tables = tables
+        self.settings = settings
+        self.intervals = settings['intervals']
+        self.regions = regions
+        self.notifier = notifier
+        self.inQ = inQ
+        self.outQ = outQ
+
+        self.samples = {t: {'sample': {}, 'time': None} for t in tables}
+
+    def run(self):
+        ''' Per-car process that polls the Tesla API, logs the data, and emits
+            notifications.
+
+            This is intended to be called by Multiprocessing.Process()
+        '''
+        CHANGING_FIELDS = set(['timestamp', 'gps_as_of'])
+        now = int(time.time())
+
+        try:
+            state = self.car.getCarState()
+            if self.db:
+                self.db.insertState(state)
+            prevLoc = LatLon(state['driveState']['latitude'],
+                             state['driveState']['longitude'])
+            for tableName in self.samples:
+                self.samples[tableName]['sample'] = state[tableName]
+                self.samples[tableName]['time'] = now
+
+            carName = self.car.getName()
+            self.outQ.put("TRACKING {0}".format(carName))
+
+            while True:
+                try:
+                    cmd = self.inQ.get_nowait()
+                    if cmd == "STOP":
+                        self.outQ.put("STOPPING {0}".format(carName))
+                        break
+                    elif cmd == "PAUSE":
+                        cmd = self.inQ.get()
+                        while cmd != "RESUME":
+                            cmd = self.inQ.get()
+                    elif cmd == "RESUME":
+                        pass
+                    else:
+                        sys.stderr.write("WARNING: unknown tracker command '{0}'".format(cmd))
+                except Queue.Empty:
                     pass
-                else:
-                    sys.stderr.write("WARNING: unknown tracker command '{0}'".format(cmd))
-            except Queue.Empty:
-                pass
 
-            #### TODO implement the poll loop
-            #### TEMP TEMP TEMP
-            #### FIXME use the per-dict intervals and lastSampled times
-            #### TODO get current Location object, create vector of In-Region booleans, compute other events, call notifier for events
-            curTime = int(time.time())
-            if curTime > (lastFullSample + FULL_SAMPLE_INTERVAL):
-                state = carObj.getCarState()
-                if carDB:
-                    carDB.insertState(state)
-                lastFullSample = curTime
-            else:
-                sample = carObj.getDriveState()
-                if carDB:
-                    carDB.insertRow('driveState', sample)
+                #### TODO implement the poll loop
+                #### TODO get current Location object, create vector of In-Region booleans, compute other events, call notifier for events
+                curTime = int(time.time())
+                for tableName in self.samples:
+                    if curTime >= self.samples[tableName]['time'] + self.intervals[tableName]:
+                        sample = self.car.getTable(tableName)
+                        print("SAMPLE: {0}".format(tableName))
+                        add, rem, chg, _ = dictDiff(self.samples[tableName]['sample'], sample)
+                        if self.db:
+                            if add or rem:
+                                self.outQ.put("Table {0} Schema Change: ADD={1}, REM={2}".
+                                              format(tableName, add, rem))
+                            if not chg - CHANGING_FIELDS:
+                                print("WRITE TO DB")   #### TMP TMP TMP
+                                self.db.insertRow(tableName, sample)
 
-            #### TODO make the polling interval a function of the car's state -- poll more frequently when driving and less when parked
-            time.sleep(LOCATION_SAMPLE_INTERVAL)
+                        if tableName == 'driveState':
+                            newLoc = LatLon(sample['latitude'], sample['longitude'])
+                            dist = newLoc.distance(prevLoc)
+                            print(dist) #### TMP TMP TMP
+                            if dist > self.settings['thresholds']['distance']:
+                                print("MOVED: {0}".format(dist))
 
-    except Exception as e:
-        msg = "BAILING {0}: {1}".format(carName, e)
-        outQ.put(msg)
-    carDB.close()
+                        self.samples[tableName]['sample'] = sample
+                        self.samples[tableName]['time'] = curTime
+
+                #### TODO make the polling interval a function of the car's state
+                ####      poll more frequently when driving and less when parked
+                print("SLEEP")
+                nextInterval = 1.0    #### TMP TMP TMP
+                time.sleep(nextInterval)
+
+        except Exception as e:
+            traceback.print_exc()
+            self.outQ.put("BAILING {0}: {1}".format(carName, e))
+        if self.db:
+            self.db.close()
