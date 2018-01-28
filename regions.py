@@ -11,7 +11,6 @@ import time
 import json
 import random
 import LatLon
-import dateutil
 import teslajson
 from datetime import datetime
 from optparse import OptionParser
