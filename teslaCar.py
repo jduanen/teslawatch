@@ -14,6 +14,15 @@ import urllib2
 
 INTER_CMD_DELAY = 0.1
 
+# map the car DB schema name to the Tesla API name
+TABLES_NAME_MAP = {
+    'chargeState': "charge_state",
+    'climateState': "climate_state",
+    'driveState': "drive_state",
+    'guiSettings': "gui_settings",
+    'vehicleState': "vehicle_state"
+}
+
 
 class Car(object):
     '''Car object that encapsulates the state of a car,
@@ -56,7 +65,7 @@ class Car(object):
         try:
             r = self.vehicle.wake_up()
         except Exception as e:
-            sys.stderr.write("WARNING: failed to wake up car '{0}'\n".format(self.vin))
+            sys.stderr.write("WARNING: failed to wake up car '{0}': {1}\n".format(self.vin, e))
             return None
         #### TODO check for error response: print warning and return None
         return r['response']
@@ -64,6 +73,20 @@ class Car(object):
     def getName(self):
         ''' Return car's name'''
         return self.vehicle['display_name']
+
+    def getTable(self, tableName):
+        ''' Take the name of a table in the Tesla API and return it as a dict.
+
+            Inputs
+                tableName: name of one of the Tesla API's state tables
+
+            Returns
+                dict with contents of desired table, or None if error
+        '''
+        if tableName not in TABLES_NAME_MAP.keys():
+            sys.stderr.write("ERROR: invalid table name '{0}'".format(tableName))
+            return None
+        return self._dataRequest(TABLES_NAME_MAP[tableName])
 
     def getChargeState(self):
         ''' Get the car's charge state'''
