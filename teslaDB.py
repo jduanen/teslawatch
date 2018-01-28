@@ -29,15 +29,15 @@ class CarDB(object):
         'string': "TEXT"
     }
 
-    def __init__(self, vin, dbFile, schemaFile, create=True):
+    def __init__(self, vin, dbFile, schema, create=True):
         ''' Instantiate a DB object for the car given by the VIN and connect to
             the given DB file.
 
             Inputs
                 vin: VIN string for a car
                 dbFile: Path to a Sqlite3 DB file (created if doesn't exist)
-                schemaFile: Path to a YAML file that contains the schema for
-                    all of the tables in the DB
+                schema: Dict containing the schema for all of the tables from
+                    the Tesla API (that will become tables in the DB)
                 create: If True, creates file if not found, otherwise fails if
                     file not found.
             Returns
@@ -53,15 +53,7 @@ class CarDB(object):
         self.db = sqlite3.connect(dbFile)
         self.cursors = {}
 
-        if not os.path.exists(schemaFile):
-            raise ValueError("Schema file not found: {0}".format(schemaFile))
-        try:
-            with open(schemaFile, "r") as f:
-                self.schema = yaml.load(f)
-        except IOError:
-            raise
-        except:
-            raise ValueError("Unable to read schema file: {0}".format(schemaFile))
+        self.schema = schema
 
         #### TODO validate schema version
 
