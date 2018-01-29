@@ -9,23 +9,10 @@ logLevel: WARNING
 logFile: /tmp/teslaWatch.log
 cars:
   <vin>:
-    VIN: <vin>
     notifiers:
-      SMS:
-        REGION_ENTER:
-          - HOME
-          - WORK
-        REGION_EXIT
-          - HOME
-          - WORK
-      email:
-        ????:
-          - ABOVE
-          - BELOW
-      myFunction2:
-        ????:
-          - ????
-    nickname: <string>
+      <notifier>:
+        - <eventType>
+        - <eventType>
     regions:
       - HOME:
         xxx
@@ -37,13 +24,11 @@ cars:
         bbb
       - <region3>:
         ccc
+    settings:
+      intervals:
+        '<????>': 0
+      thresholds:
+        'distance': 0
+    VIN: <vin>
   <vin>:
     VIN: <vin>
-    nickname: <string>
-settings:
-  intervals:
-    '<????>': 0
-  thresholds:
-    'distance': 0
-eventNotifiers:
-  '<eventType>': <notifier>
