@@ -6,6 +6,10 @@
 ################################################################################
 '''
 
+import sys
+
+import notifierTypes as notifierTypes
+
 '''
 --------------------
 import requests
@@ -45,3 +49,10 @@ class Notifier(object):
         ''' ????
         '''
         pass
+
+#
+# TEST
+#
+if __name__ == '__main__':
+    #### TODO
+    pass
