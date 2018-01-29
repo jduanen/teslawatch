@@ -40,3 +40,10 @@ cars:
   <vin>:
     VIN: <vin>
     nickname: <string>
+settings:
+  intervals:
+    '<????>': 0
+  thresholds:
+    'distance': 0
+eventNotifiers:
+  '<eventType>': <notifier>
