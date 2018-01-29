@@ -251,9 +251,6 @@ def main():
         if options.verbose:
             sys.stderr.write("WARNING: not logging data to DB\n")
 
-    settings = dict(DEF_SETTINGS)
-    dictMerge(settings, confs.get('config', {}).get('settings', {}))
-
     signal.signal(signal.SIGHUP, signalHandler)
     signal.signal(signal.SIGINT, signalHandler)
 
@@ -318,8 +315,10 @@ def main():
             dbFile = os.path.join(dbDir, vin + ".db")
             cdb = teslaDB.CarDB(vin, dbFile, schema)
         tables = schema['tables'].keys()
+        settings = dict(DEF_SETTINGS)
+        dictMerge(settings, confs.get('config', {}).get('settings', {}))
         regions = [Region(r) for r in conf.get('regions', [])]
-        notifier = Notifier(conf.get('notifiers'))
+        notifier = Notifier(confs.get('config', {}).get('eventNotifiers', {}))
         cmdQs[vin] = mp.Queue()
         respQs[vin] = mp.Queue()
         tracker = Tracker(car, cdb, tables, settings, regions, notifier,
