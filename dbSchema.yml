@@ -213,7 +213,13 @@ tables:
         type: integer
       seat_heater_right:
         type: integer
+      side_mirror_heaters:
+        type: boolean
       smart_preconditioning:
+        type: boolean
+      steering_wheel_heater:
+        type: boolean
+      wiper_blade_heater:
         type: boolean
       timestamp:
         type: integer
@@ -241,7 +247,10 @@ tables:
       - seat_heater_rear_right
       - seat_heater_rear_right_back
       - seat_heater_right
+      - side_mirror_heaters
       - smart_preconditioning
+      - steering_wheel_heater
+      - wiper_blade_heater
       - timestamp
     additionalProperties: false
     readOnly: true
@@ -338,6 +347,14 @@ tables:
         type: number
       longitude:
         type: number
+      native_latitude:
+        type: number
+      native_location_supported:
+        type: integer
+      native_longitude:
+        type: number
+      native_type:
+        type: string
       power:
         type: integer
       shift_state:
@@ -351,6 +368,10 @@ tables:
       - heading
       - latitude
       - longitude
+      - native_latitude
+      - native_location_supported
+      - native_longitude
+      - native_type
       - power
       - shift_state
       - speed
