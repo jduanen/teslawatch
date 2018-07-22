@@ -11,26 +11,22 @@ import sys
 import time
 import traceback
 
-from LatLon import (LatLon, Latitude, Longitude)
+from LatLon import LatLon
 
 from regions import Region
 
 
 '''
 TODO
-  * periodically (e.g., once a day) get all the settings
-  * poll the location and manage transitions between parked (home/away), moving, and stopped states
   * generate parked->moving/stopped and parked/moving->stopped events
   * look for geofence entry/exit events
   * look for temperature events (too hot/cold)
   * look for doors/windows open/unlocked for period of time events
   * look for battery going below a threshold events
-  * add callback arg for events
   * add arg with dict of all the callbacks for the events of interest and the parameters for that type of event
   * make hooks that can call arbitrary functions in addition to sending messages on events
     - allow automation of locking/shutting/turning on/off climate, opening/closing stuff
   * specify functions to call (potentially external/shell cmds, in addition to those in events.py) in configs file
-  * make separate poll rate/interval for each table
   * up the poll rate for drive state when moving to more frequent, less when stopped/parked
   * poll frequency: driveState (D/R vs P), vehicleState, chargeState, {climateSettings, guiSettings}
   * make the tracker keep track of previous states, detect transitions, and call the event object (with args relevent to the event)
@@ -61,6 +57,14 @@ EVENT TYPES: all events qualified by day-of-week and time-of-day ranges
   * door/window/sunroof open/unlocked while parked, for greater than threshold of time
   * battery level goes below a given threshold
 '''
+
+# event types recognized by the application
+EVENT_TYPES = (
+    "STOPPED_MOVING",
+    "STARTED_MOVING",
+    "ENTER_REGION",    # arg: regionId
+    "EXIT_REGION",     # arg: regionId
+)
 
 # commands that can be sent on the trackers' command Queue
 TRACKER_CMDS = ("PAUSE", "RESUME", "STOP")
@@ -114,7 +118,6 @@ class Tracker(object):
         self.db = carDB
         self.tables = tables
         self.settings = settings
-        self.intervals = settings['intervals']
         self.regions = regions
         self.notifier = notifier
         self.inQ = inQ
@@ -163,9 +166,10 @@ class Tracker(object):
 
                 #### TODO implement the poll loop
                 #### TODO get current Location object, create vector of In-Region booleans, compute other events, call notifier for events
+                events = {}
                 curTime = int(time.time())
                 for tableName in self.samples:
-                    if curTime >= self.samples[tableName]['time'] + self.intervals[tableName]:
+                    if curTime >= self.samples[tableName]['time'] + self.settings['intervals'][tableName]:
                         sample = self.car.getTable(tableName)
                         print("SAMPLE: {0}".format(tableName))
                         add, rem, chg, _ = dictDiff(self.samples[tableName]['sample'], sample)
@@ -183,9 +187,19 @@ class Tracker(object):
                             print(dist) #### TMP TMP TMP
                             if dist > self.settings['thresholds']['distance']:
                                 print("MOVED: {0}".format(dist))
+                                #### TODO implement the logic to detect state transitions -- i.e., keep state, note the change, update accordingly
+                                '''
+                                if self.moving:
+                                    self.notifier.notify("STOPPED_MOVING", arg)
+                                else:
+                                    self.notifier.notify("STARTED_MOVING", arg)
+                                '''
 
                         self.samples[tableName]['sample'] = sample
                         self.samples[tableName]['time'] = curTime
+
+                    #### call notifier and pass it events
+                    pass
 
                 #### TODO make the polling interval a function of the car's state
                 ####      poll more frequently when driving and less when parked
@@ -198,3 +212,10 @@ class Tracker(object):
             self.outQ.put("BAILING {0}: {1}".format(carName, e))
         if self.db:
             self.db.close()
+
+#
+# TESTING
+#
+if __name__ == '__main__':
+    #### TODO implement test cases
+    pass
