@@ -1,3 +1,4 @@
+#!/usr/bin/env python
 '''
 ################################################################################
 #
@@ -7,8 +8,6 @@
 '''
 
 import sys
-
-import notifierTypes as notifierTypes
 
 '''
 --------------------
@@ -36,23 +35,15 @@ TODO:
   * create structure with Event types (and args)
 '''
 
-eventTypes = {
-    'a': 1
-}
+def main(args):
+    if len(args) != 2:
+        sys.stderr.write("Error: invalid number of args '{0}' != 2\n".format(len(args)))
+        sys.exit(1)
+    print("SMS: '{0}'".format(args[1]))
 
-
-class Notifier(object):
-    ''' ????
-    '''
-
-    def __init__(self, arg):
-        ''' ????
-        '''
-        pass
 
 #
-# TEST
+# MAIN
 #
 if __name__ == '__main__':
-    #### TODO
-    pass
+    main(sys.argv)
