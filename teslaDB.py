@@ -12,7 +12,6 @@ import json
 import os
 import sqlite3
 import sys
-import yaml
 
 
 #### TODO
@@ -58,7 +57,7 @@ class CarDB(object):
         #### TODO validate schema version
 
         if 'tables' not in self.schema:
-            raise Exception("'tables' field missing from schema file: {0}".format(schemaFile))
+            raise Exception("'tables' field missing from schema")
         for tableName in self.schema['tables'].keys():
             cols = "id INTEGER PRIMARY KEY"
             keyList = self.schema['tables'][tableName]['properties'].keys()
