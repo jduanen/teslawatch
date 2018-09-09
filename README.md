@@ -47,7 +47,7 @@ TODO:
   * different polling intervals for different states -- e.g., parked@home, nighttime, moving, etc.
   * use different packages to send SMS notifications
     - textbelt
-    - google hangouts: "hangups" package pythone3
+    - google hangouts: "hangups" package python3
   * make notification backend be pluggable
   * rewrite to be Python3
   * fix up the cmd-line interface
