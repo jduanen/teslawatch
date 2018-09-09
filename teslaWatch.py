@@ -19,6 +19,7 @@
 
 from __future__ import print_function
 import argparse
+import collections
 import json
 import logging
 import multiprocessing as mp
@@ -30,7 +31,7 @@ import sys
 import time
 import yaml
 
-from notify import Notifier
+from notifier import Notifier
 from regions import Region
 from teslaCar import Car
 import teslaDB
@@ -69,7 +70,7 @@ DEF_SETTINGS = {
 }
 
 
-def commandInterpreter(trackers, cmdQs, respQs):
+def commandInterpreter(trackers, cmds, resps):
     ''' TBD
     '''
     #### TODO implement cmd interpreter and send cmds to running trackers to restart them and change their events
@@ -86,7 +87,7 @@ def commandInterpreter(trackers, cmdQs, respQs):
             if vin not in trackers:
                 print("ERROR: VIN '{0}' not being tracked".format(vin))
             else:
-                print(dumpQueue(respQs[vin]))
+                print(dumpQueue(resps[vin]))
         if cmd == 'r':
             pass
         if cmd == 's':
@@ -94,7 +95,7 @@ def commandInterpreter(trackers, cmdQs, respQs):
             if vin not in trackers:
                 print("ERROR: VIN '{0}' not being tracked".format(vin))
             else:
-                cmdQs[vin].put("STOP")
+                cmds[vin].put("STOP")
                 #### TODO reread trackers
         elif cmd == 'q':
             break
@@ -113,9 +114,9 @@ def commandInterpreter(trackers, cmdQs, respQs):
 def dictMerge(old, new):
     ''' Merge a new dict into an old one, updating the old one (recursively).
     '''
-    for k, v in new.iteritems():
+    for k, _ in new.iteritems():
         if (k in old and isinstance(old[k], dict) and
-            isinstance(new[k], collections.Mapping)):
+                isinstance(new[k], collections.Mapping)):
             dictMerge(old[k], new[k])
         else:
             old[k] = new[k]
@@ -150,12 +151,13 @@ def main():
         ''' Catch SIGHUP to force a reload/restart and SIGINT to stop all.""
         '''
         if sig == signal.SIGHUP:
-            print("SIGHUP")
+            logging.info("SIGHUP")
             #### TODO stop, reload, and restart everything
         elif sig == signal.SIGINT:
-            print("SIGINT")
-            for q in cmdQs:
-                q.send("STOP")
+            logging.info("SIGINT")
+            for vin in cmdQs:
+                logging.debug("Stopping: %s", vin)
+                cmdQs[vin].put("STOP")
 
     usage = "Usage: {0} [-v] [-c <configsFile>] [-d <dbDir>] [-i] [-L <logLevel>] [-l <logFile>] [-p <passwd>] [-s <schemaFile>] [-V <VIN>]"
     ap = argparse.ArgumentParser()
@@ -199,39 +201,41 @@ def main():
         print("")
     #### TODO validate config file against ./configSchema.yml, remove error checks and rely on this
 
+    if options.logLevel:
+        confs['config']['logLevel'] = options.logLevel
+    else:
+        if 'logLevel' not in confs['config']:
+            confs['config']['logLevel'] = DEF_LOG_LEVEL
+    logLevel = confs['config']['logLevel']
+    l = getattr(logging, logLevel, None)
+    if not isinstance(l, int):
+        fatalError("Invalid log level: {0}\n".format(logLevel))
+
+    if options.logFile:
+        confs['config']['logFile'] = options.logFile
+    logFile = confs['config'].get('logFile')
+    if logFile:
+        logging.basicConfig(filename=logFile, level=l)
+    else:
+        logging.basicConfig(level=l)
+
     carVINs = confs['cars'].keys()
     if options.VIN:
         carVINs = [options.VIN]
     if not carVINs:
         fatalError("Must provide the VIN(s) of one or more car(s) to be tracked")
-    if options.verbose > 2:
-        print("cars: {0}".format(carVINs))
+    logging.debug("cars: %s", carVINs)
 
     user = confs.get('user')
     if not user:
         user = raw_input("user: ")
-    if options.verbose > 2:
-        print("user: {0}".format(user))
+    logging.debug("user: %s", user)
 
     password = confs.get('passwd')
     if options.password:
         password = options.password
     if not password:
         password = raw_input("password: ")
-
-    logLevel = confs.get('logLevel')
-    if options.logLevel:
-        logLevel = options.logLevel
-
-    logFile = confs.get('logFile')
-    if options.logFile:
-        logFile = options.logFile
-    if not options.logLevel:
-        l = getattr(logging, logLevel, None)
-        #### TODO remove tests and rely on jsonschema validation
-        if not isinstance(l, int):
-            fatalError("Invalid log level: {0}\n".format(logLevel))
-        logging.basicConfig(filename=logFile, level=l)
 
     schemaFile = confs.get('schema')
     if options.schemaFile:
@@ -258,12 +262,10 @@ def main():
         conn = teslajson.Connection(user, password)
     except Exception as e:
         fatalError("Failed to connect {0}".format(e))
-    if options.verbose > 3:
-        print("CONNECTION: {0}".format(conn))
-        print("")
+    logging.info("Connection: %s", conn)
 
-    if options.verbose > 2:
-        print("Number of vehicles: {0}".format(len(conn.vehicles)))
+    logging.info("Number of vehicles: %d", len(conn.vehicles))
+    if options.verbose > 1:
         n = 1
         for v in conn.vehicles:
             print("Vehicle #{0}:".format(n), end='')
@@ -280,11 +282,10 @@ def main():
     if notFound:
         fatalError("Cars asked for, but not found in Tesla API: {0}".format(notFound))
 
-    if options.verbose > 1:
-        print("Watching: {0}".format(vinList))
-        notAskedFor = list(set(teslaVINs) - set(vinList))
-        if notAskedFor:
-            print("Cars Tesla API knows about, but not asked for: {0}".format(notAskedFor))
+    logging.debug("Watching: %s", vinList)
+    notAskedFor = list(set(teslaVINs) - set(vinList))
+    if notAskedFor:
+        logging.warning("Cars Tesla API knows about, but not asked for: %s", notAskedFor)
 
     vehicles = {v['vin']: v for v in conn.vehicles if v['vin'] in vinList}
     if options.verbose > 3:
@@ -299,11 +300,9 @@ def main():
     for vin in vinList:
         conf = confs['cars'][vin]
         cars[vin] = car = Car(vin, conf, vehicles[vin])
-        if options.verbose > 1:
-            print("Waking up {0}: {1}".format(vin, car.getName()))
+        logging.info("Waking up %s: %s", vin, car.getName())
         if not car.wakeUp():
-            if options.verbose > 1:
-                print("Unable to wake up '{0}', skipping...".format(car.getName()))
+            logging.warning("Unable to wake up '%s', skipping...", car.getName())
             time.sleep(random.randint(5, 15))
             continue
 
@@ -323,10 +322,10 @@ def main():
         respQs[vin] = mp.Queue()
         tracker = Tracker(car, cdb, tables, settings, regions, notifier,
                           cmdQs[vin], respQs[vin])
-        tracker.run()  #### TMP TMP TMP
-        sys.exit(1)    #### TMP TMP TMP
-
+        logging.info("Tracker: %s", vin)
         trackers[vin] = mp.Process(target=tracker.run, args=())
+
+    for vin in trackers:
         trackers[vin].start()
 
     if options.interactive:
@@ -334,11 +333,9 @@ def main():
 
     for vin in trackers:
         trackers[vin].join()
+        logging.debug("Results for %s: %s", vin, dumpQueue(respQs[vin]))
 
-    if options.verbose > 1:
-        for vin in trackers:
-            print("Results for {0}: {1}".format(vin, dumpQueue(respQs[vin])))
-            print("")
+    return cars
 
 if __name__ == '__main__':
     main()
