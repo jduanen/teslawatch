@@ -152,6 +152,7 @@ class Tracker(object):
                     cmd = self.inQ.get_nowait()
                     if cmd == "STOP":
                         self.outQ.put("STOPPING {0}".format(carName))
+                        print("Exiting:", self.car.vin)    #### TMP TMP TMP
                         break
                     elif cmd == "PAUSE":
                         cmd = self.inQ.get()
@@ -171,22 +172,22 @@ class Tracker(object):
                 for tableName in self.samples:
                     if curTime >= self.samples[tableName]['time'] + self.settings['intervals'][tableName]:
                         sample = self.car.getTable(tableName)
-                        print("SAMPLE: {0}".format(tableName))
+                        print("Sample:", tableName, "; VIN:", self.car.vin)    #### TMP TMP TMP
                         add, rem, chg, _ = dictDiff(self.samples[tableName]['sample'], sample)
                         if self.db:
                             if add or rem:
                                 self.outQ.put("Table {0} Schema Change: ADD={1}, REM={2}".
                                               format(tableName, add, rem))
                             if not chg - CHANGING_FIELDS:
-                                print("WRITE TO DB")   #### TMP TMP TMP
+                                print("Write to DB:", self.car.vin)   #### TMP TMP TMP
                                 self.db.insertRow(tableName, sample)
 
                         if tableName == 'driveState':
                             newLoc = LatLon(sample['latitude'], sample['longitude'])
                             dist = newLoc.distance(prevLoc)
-                            print(dist) #### TMP TMP TMP
+                            print("Distance:", dist, "; VIN:", self.car.vin) #### TMP TMP TMP
                             if dist > self.settings['thresholds']['distance']:
-                                print("MOVED: {0}".format(dist))
+                                print("Moved: {0}".format(dist))
                                 #### TODO implement the logic to detect state transitions -- i.e., keep state, note the change, update accordingly
                                 '''
                                 if self.moving:
@@ -199,17 +200,18 @@ class Tracker(object):
                         self.samples[tableName]['time'] = curTime
 
                     #### call notifier and pass it events
+                    print("Call Notifier:", self.car.vin)  #### TMP TMP TMP
                     pass
 
                 #### TODO make the polling interval a function of the car's state
                 ####      poll more frequently when driving and less when parked
-                print("SLEEP")
+                print("Sleep:", self.car.vin)
                 nextInterval = 1.0    #### TMP TMP TMP
                 time.sleep(nextInterval)
 
         except Exception as e:
             traceback.print_exc()
-            self.outQ.put("BAILING {0}: {1}".format(carName, e))
+            self.outQ.put("BAILING {0}: {1}".format(self.car.vin, e))
         if self.db:
             self.db.close()
 
