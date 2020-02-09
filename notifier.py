@@ -23,14 +23,12 @@ class Notifier(object):
     '''
     def __init__(self, notifiers):
         self.notifiers = {}
-        for notifier, eventTypes in notifiers.iteritems():
+        for notifier, eventTypes in notifiers.items():
             fPath = os.path.join(NOTIFIER_DIR, notifier)
             if not os.path.isfile(fPath) or not os.access(fPath, os.X_OK):
-                raise ValueError("Invalid notifier program '{0}' for events '{1}".
-                                 format(fPath, eventTypes))
+                raise ValueError(f"Invalid notifier program '{fPath}' for events '{eventTypes}")
             if not set(eventTypes).issubset(set(EVENT_TYPES)):
-                raise ValueError("Invalid event types '{0}' for notifier '{1}'".
-                                 format(set(eventTypes) - set(EVENT_TYPES), notifier))
+                raise ValueError(f"Invalid event types '{set(eventTypes) - set(EVENT_TYPES)}' for notifier '{notifier}'")
             for eventType in eventTypes:
                 if eventType not in self.notifiers:
                     self.notifiers[eventType] = []
@@ -46,9 +44,9 @@ class Notifier(object):
             raise ValueError("Must provide arg")
         for notifier in self.notifiers[eventType]:
             #### FIXME call all the notifiers (with the given arg) that ar associated with this event type
-            print("Event: {0}, Notifier: {1}({2})".format(eventType, notifier, arg))
-            if os.system("{0} {1}".format(notifier, arg)):
-                raise Exception("Command '{0}({1})' failed")
+            print(f"Event: {eventType}, Notifier: {notifier}({arg})")
+            if os.system(f"{notifier} {arg}"):
+                raise Exception(f"Command '{notifier}({arg})' failed")
 
 
 #
@@ -74,7 +72,7 @@ if __name__ == '__main__':
 
         n.notify("ENTER_REGION", "yyy")
     except Exception as e:
-        print("FAILED: {0}".format(e))
+        print("FAILED: {e}")
         sys.exit(1)
 
     # should fail

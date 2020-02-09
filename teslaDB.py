@@ -6,7 +6,6 @@
 ################################################################################
 '''
 
-from __future__ import print_function
 import argparse
 import json
 import os
@@ -46,7 +45,7 @@ class CarDB(object):
 
         if not create:
             if not os.path.exists(dbFile):
-                raise ValueError("Invalid DB file: {0}".format(dbFile))
+                raise ValueError(f"Invalid DB file: {dbFile}")
         self.dbFile = dbFile
 
         self.db = sqlite3.connect(dbFile)
@@ -64,7 +63,7 @@ class CarDB(object):
             keyList.sort()
             for colName in keyList:
                 colType = CarDB.TYPE_MAP[self.schema['tables'][tableName]['properties'][colName]['type']]
-                cols += ", {0} {1}".format(colName, colType)
+                cols += f", {colName} {colType}"
             self.createTable(tableName, cols)
 
     def __enter__(self):
@@ -86,7 +85,7 @@ class CarDB(object):
         '''
         self.cursors[tableName] = None
         c = self.db.cursor()
-        tableDef = "CREATE TABLE IF NOT EXISTS {0} ({1});".format(tableName, tableCols)
+        tableDef = f"CREATE TABLE IF NOT EXISTS {tableName} ({tableCols});"
         c.execute(tableDef)
         self.db.commit()
 
@@ -97,7 +96,7 @@ class CarDB(object):
               tableName: String with name of table to be created
         '''
         c = self.db.cursor()
-        sqlCmd = "SELECT * FROM {0};".format(tableName)
+        sqlCmd = f"SELECT * FROM {tableName};"
         table = c.execute(sqlCmd).fetchall()
         return table
 
@@ -132,7 +131,7 @@ class CarDB(object):
               row: dict whose keys are names of columns in the Table
         '''
         if not row:
-            sys.stderr.write("WARNING: empty row for table '{0}'; skipping...\n".format(tableName))
+            sys.stderr.write(f"WARNING: empty row for table '{tableName}'; skipping...\n")
             return
         c = self.db.cursor()
         cols = ", ".join('"{}"'.format(col) for col in row.keys())
@@ -149,7 +148,7 @@ class CarDB(object):
               state: A dict whose keys are the names of tables in the DB and whose
                      values are (single) rows for the given table.
         '''
-        for tableName, row in state.iteritems():
+        for tableName, row in state.items():
             try:
                 self.insertRow(tableName, row)
             except Exception as e:
@@ -163,7 +162,7 @@ class CarDB(object):
               more exist, at which point it returns a None.
         '''
         self.cursors[tableName] = self.db.cursor()
-        sqlCmd = "SELECT * FROM {0};".format(tableName)
+        sqlCmd = f"SELECT * FROM {tableName};"
         self.cursors[tableName].execute(sqlCmd)
         return self.cursors[tableName]
 
@@ -172,17 +171,11 @@ class CarDB(object):
 # TESTING
 #
 if __name__ == '__main__':
+    from teslawatch import fatalError
+
     DEF_SCHEMA_FILE = "./dbSchema.yml"
 
     DUMMY_VIN = "5YJSA1H10EFP00000"
-
-    # Print the given message, print the usage string, and exit with an error.
-    def fatalError(msg):
-        ''' Print the given msg on stderr and exit.
-        '''
-        sys.stderr.write("Error: {0}\n".format(msg))
-        sys.stderr.write("Usage: {0}\n".format(usage))
-        sys.exit(1)
 
     usage = "Usage: {0} [-v] [-s <schemaFile>] <dbFile>"
     ap = argparse.ArgumentParser()
