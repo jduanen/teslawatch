@@ -33,11 +33,12 @@ import time
 
 import yaml
 
+import teslajson
+
 from notifier import Notifier
 from regions import Region
 from teslaCar import Car
 import teslaDB
-import teslajson
 from teslawatch import fatalError, dictMerge
 from tracker import Tracker
 
@@ -130,7 +131,7 @@ def dumpQueue(q):
 
 def run(options):
     try:
-        conn = teslajson.Connection(options.user, options.password)
+        conn = teslajson.Connection(options.user, options.passwd)
     except Exception as e:
         fatalError(f"Failed to connect: {e}")
     logging.info(f"Connection: {conn}")
@@ -171,6 +172,26 @@ def run(options):
         json.dump(vehicles, sys.stdout, indent=4, sort_keys=True)
         print("")
 
+    if opts.schemaFile:
+        schemaFile = opts.schemaFile
+    else:
+        schemaFile = opts.confs.get('schema')
+    if not os.path.isfile(schemaFile):
+        fatalError(f"Invalid DB schema file: {schemaFile}")
+    with open(schemaFile, "r") as f:
+        schema = yaml.load(f, Loader=yaml.Loader)
+
+    if opts.dbDir:
+        dbDir = opts.dbDir
+    else:
+        dbDir = opts.confs.get('dbDir')
+    if dbDir:
+        if not os.path.isdir(dbDir):
+            fatalError(f"Invalid DB directory path: {dbDir}")
+    else:
+        if opts.verbose:
+            logging.warning("Not logging data to DB")
+
     cars = {}
     cmdQs = {}
     respQs = {}
@@ -178,7 +199,7 @@ def run(options):
     for vin in vinList:
         conf = opts.confs['cars'][vin]
         cars[vin] = car = Car(vin, conf, vehicles[vin])
-        logging.info("Waking up {vin}: {car.getName()}")
+        logging.info(f"Waking up {vin}: {car.getName()}")
         if not car.wakeUp():
             logging.warning(f"Unable to wake up '{car.getName()}', skipping...")
             time.sleep(random.randint(5, 15))
@@ -302,26 +323,7 @@ def getOps():
         password = confs.get('passwd')
     if not password:
         password = input("password: ")
-
-    if opts.schemaFile:
-        schemaFile = opts.schemaFile
-    else:
-        schemaFile = confs.get('schema')
-    if not os.path.isfile(schemaFile):
-        fatalError(f"Invalid DB schema file: {schemaFile}")
-    with open(schemaFile, "r") as f:
-        schema = yaml.load(f, Loader=yaml.Loader)
-
-    if opts.dbDir:
-        dbDir = opts.dbDir
-    else:
-        dbDir = confs.get('dbDir')
-    if dbDir:
-        if not os.path.isdir(dbDir):
-            fatalError(f"Invalid DB directory path: {dbDir}")
-    else:
-        if opts.verbose:
-            logging.warning("Not logging data to DB")
+    opts.passwd = password
 
     signal.signal(signal.SIGHUP, signalHandler)
     signal.signal(signal.SIGINT, signalHandler)
