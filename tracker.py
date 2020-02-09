@@ -158,7 +158,7 @@ class Tracker(object):
                         if tableName == 'driveState':
                             newLoc = geocoder.reverse((sample['latitude'],
                                                        sample['longitude']))
-                            dist = distance.distance(prevLoc, newLoc).km
+                            dist = distance.distance(prevLoc.point, newLoc.point).km
                             print(f"Distance: {dist} km; VIN: {self.car.vin}") #### TMP TMP TMP
                             if dist > self.settings['thresholds']['distance']:
                                 print(f"Moved: {dist}")
