@@ -9,7 +9,7 @@
 import json
 import sys
 import time
-import urllib2
+##from urllib import HTTPError
 
 
 INTER_CMD_DELAY = 0.1
@@ -45,7 +45,8 @@ class Car(object):
         while True:
             try:
                 r = self.vehicle.data_request(cmd)
-            except urllib2.HTTPError as e:
+##            except HTTPError as e:
+            except Exception as e:
                 #### TODO better exception handler
                 sys.stderr.write("WARNING: {0}\n".format(e))
                 if e.code == 400:
