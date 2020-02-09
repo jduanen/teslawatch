@@ -10,10 +10,11 @@ import sys
 import time
 import json
 import random
-import LatLon
-import teslajson
 from datetime import datetime
-from optparse import OptionParser
+
+from geopy import distance
+
+import teslajson
 
 '''
 * Region Object encapsulates
@@ -42,18 +43,22 @@ from optparse import OptionParser
       - SMS: phone number, API key
 '''
 
-HOME_LAT = 37.460184
-HOME_LON = -122.166203
-HOME_LOC = LatLon.LatLon(LatLon.Latitude(HOME_LAT), LatLon.Longitude(HOME_LON))
+##HOME_LAT = 37.460184
+#HOME_LON = -122.166203
+#HOME_LOC = LatLon.LatLon(LatLon.Latitude(HOME_LAT), LatLon.Longitude(HOME_LON))
 
-WORK_LAT = 37.3848558
-WORK_LON = -121.9947407
-WORK_LOC = LatLon.LatLon(LatLon.Latitude(WORK_LAT), LatLon.Longitude(WORK_LON))
+#WORK_LAT = 37.3848558
+#WORK_LON = -121.9947407
+#WORK_LOC = LatLon.LatLon(LatLon.Latitude(WORK_LAT), LatLon.Longitude(WORK_LON))
 
-STANFORD_LAT = 37.430598
-STANFORD_LON = -122.173109
-STANFORD_LOC = LatLon.LatLon(LatLon.Latitude(STANFORD_LAT),
-                             LatLon.Longitude(STANFORD_LON))
+#STANFORD_LAT = 37.430598
+#STANFORD_LON = -122.173109
+#STANFORD_LOC = LatLon.LatLon(LatLon.Latitude(STANFORD_LAT),
+#                             LatLon.Longitude(STANFORD_LON))
+
+#h = g.geocode("184 Seminary Drive, Menlo Park, CA")
+#print(h)
+#Location(184, Seminary Drive, Menlo Park, San Mateo County, California, 94025, United States of America, (37.4601311, -122.16625850563815, 0.0))
 
 
 """
@@ -108,13 +113,11 @@ class Shape(object):
 class Circle(Shape):
     def __init__(self, lat, lon, radius, id=None):
         super(Circle, self).__init__(id)
-        self.location = LatLon.LatLon(LatLon.Latitude(lat),
-                                      LatLon.Longitude(lon))
+        self.location = geocoder.reverse((lat, lon))
         self.radius = radius
 
     def _getDistance(self, lat, lon):
-        d = self.location.distance(LatLon.LatLon(LatLon.Latitude(lat),
-                                                 LatLon.Longitude(lon)))
+        d = distance.distance(self.location.point, (lat, lon))
         return d
 
     def isInside(self, lat, lon):
@@ -228,6 +231,8 @@ class Region(object):
 # TESTING
 #
 if __name__ == '__main__':
+    from optparse import OptionParser
+
     usage = "Usage: {0} [-v] [-u <email>] -p <pswd> [-V <vin>]"
     parser = OptionParser(usage)
     parser.add_option("-v", "--verbose", action="store_true", dest="verbose",
@@ -247,6 +252,6 @@ if __name__ == '__main__':
 
     # pre-execution printouts
     if options.verbose:
-        sys.stdout.write("    User: {0}\n".format(user))
+        sys.stdout.write(f"    User: {user}\n")
         if options.vin:
-            sys.stdout.write("    VIN:  {0}\n".format(vin))
+            sys.stdout.write(f"    VIN:  {vin}\n")
