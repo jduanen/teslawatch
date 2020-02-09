@@ -6,12 +6,12 @@
 ################################################################################
 '''
 
-import Queue
+import queue
 import sys
 import time
 import traceback
 
-from LatLon import LatLon
+from geopy import distance
 
 from regions import Region
 
@@ -70,34 +70,6 @@ EVENT_TYPES = (
 TRACKER_CMDS = ("PAUSE", "RESUME", "STOP")
 
 
-def dictDiff(newDict, oldDict):
-    '''Take a pair of dictionaries and return a four-tuple with the elements
-       that are: added, removed, changed, and unchanged between the new
-       and the old dicts.
-       Inputs:
-         newDict: dict whose content might have changed
-         oldDict: dict that is being compared against
-
-       Returns
-         added: set of dicts that were added
-         removed: set of dicts that were removed
-         changed: set of dicts that were changed
-         unchanged: set of dicts that were not changed
-    '''
-    inOld = set(oldDict)
-    inNew = set(newDict)
-
-    added = (inNew - inOld)
-    removed = (inOld - inNew)
-
-    common = inOld.intersection(inNew)
-
-    changed = set(x for x in common if oldDict[x] != newDict[x])
-    unchanged = (common - changed)
-
-    return (added, removed, changed, unchanged)
-
-
 class Tracker(object):
     ''' Object that encapsulates all of the state associated with a car that is being tracked
     '''
@@ -138,8 +110,8 @@ class Tracker(object):
             state = self.car.getCarState()
             if self.db:
                 self.db.insertState(state)
-            prevLoc = LatLon(state['driveState']['latitude'],
-                             state['driveState']['longitude'])
+            prevLoc = geocoder.reverse((state['driveState']['latitude'],
+                                        state['driveState']['longitude']))
             for tableName in self.samples:
                 self.samples[tableName]['sample'] = state[tableName]
                 self.samples[tableName]['time'] = now
@@ -162,7 +134,7 @@ class Tracker(object):
                         pass
                     else:
                         sys.stderr.write("WARNING: unknown tracker command '{0}'".format(cmd))
-                except Queue.Empty:
+                except queue.Empty:
                     pass
 
                 #### TODO implement the poll loop
@@ -172,22 +144,23 @@ class Tracker(object):
                 for tableName in self.samples:
                     if curTime >= self.samples[tableName]['time'] + self.settings['intervals'][tableName]:
                         sample = self.car.getTable(tableName)
-                        print("Sample:", tableName, "; VIN:", self.car.vin)    #### TMP TMP TMP
+                        print(f"Sample: {tableName}; VIN: {self.car.vin}")    #### TMP TMP TMP
                         add, rem, chg, _ = dictDiff(self.samples[tableName]['sample'], sample)
                         if self.db:
                             if add or rem:
                                 self.outQ.put("Table {0} Schema Change: ADD={1}, REM={2}".
                                               format(tableName, add, rem))
                             if not chg - CHANGING_FIELDS:
-                                print("Write to DB:", self.car.vin)   #### TMP TMP TMP
+                                print(f"Write to DB: {self.car.vin}")   #### TMP TMP TMP
                                 self.db.insertRow(tableName, sample)
 
                         if tableName == 'driveState':
-                            newLoc = LatLon(sample['latitude'], sample['longitude'])
-                            dist = newLoc.distance(prevLoc)
-                            print("Distance:", dist, "; VIN:", self.car.vin) #### TMP TMP TMP
+                            newLoc = geocoder.reverse((sample['latitude'],
+                                                       sample['longitude']))
+                            dist = distance.distance(prevLoc, newLoc).km
+                            print(f"Distance: {dist} km; VIN: {self.car.vin}") #### TMP TMP TMP
                             if dist > self.settings['thresholds']['distance']:
-                                print("Moved: {0}".format(dist))
+                                print(f"Moved: {dist}")
                                 #### TODO implement the logic to detect state transitions -- i.e., keep state, note the change, update accordingly
                                 '''
                                 if self.moving:
@@ -205,7 +178,7 @@ class Tracker(object):
 
                 #### TODO make the polling interval a function of the car's state
                 ####      poll more frequently when driving and less when parked
-                print("Sleep:", self.car.vin)
+                print(f"Sleep: {self.car.vin}")
                 nextInterval = 1.0    #### TMP TMP TMP
                 time.sleep(nextInterval)
 
