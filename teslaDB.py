@@ -16,6 +16,9 @@ import sys
 #### TODO
 ####  * Version the schema and put in checks
 
+#### FIXME figure out how to deal with the new nested objects in the schema
+####        e.g., recursively flatten out the json object, prepend the name
+
 
 class CarDB(object):
     '''Object that encapsulates the Sqlite3 DB that contains data from a car,
@@ -60,8 +63,7 @@ class CarDB(object):
         for tableName in self.schema['tables'].keys():
             cols = "id INTEGER PRIMARY KEY"
             keyList = self.schema['tables'][tableName]['properties'].keys()
-            keyList.sort()
-            for colName in keyList:
+            for colName in sorted(keyList):
                 colType = CarDB.TYPE_MAP[self.schema['tables'][tableName]['properties'][colName]['type']]
                 cols += f", {colName} {colType}"
             self.createTable(tableName, cols)
