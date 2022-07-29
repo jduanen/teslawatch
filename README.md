@@ -1,5 +1,5 @@
 # teslawatch -- DEPRECATED
-Tesla tracker with geofencing and SMS notifications
+Tesla tracker with geofencing and SMS notifications -- DEPRECATED
 
 **This is work-in-progress and currently non-functional.**
 
